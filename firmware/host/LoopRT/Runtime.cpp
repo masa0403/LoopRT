@@ -1,14 +1,17 @@
 #include <Arduino.h>
 #include "Runtime.h"
-
 void Runtime::initialize()
 {
-    Serial.println("[Info] Runtime Initialize");
+    Serial.println("[INFO] Runtime Initialize");
 
     flash.initialize();
+
+    experiment.initialize();
+
+    experiment.execute();
 }
 
 void Runtime::shutdown()
 {
-    Serial.println("[Info] Runtime Shutdown");
+    Serial.println("[INFO] Runtime Shutdown");
 }

@@ -3,10 +3,10 @@
 
 void Flash::initialize()
 {
-    Serial.println("[Info] Flash Initialize");
+    Serial.println("[INFO] Flash Initialize");
 }
 
 void Flash::write()
 {
-    Serial.println("[Info] Flash Write");
+    Serial.println("[INFO] Flash Write");
 }
