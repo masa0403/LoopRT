@@ -2,6 +2,7 @@
 #define LOOPRT_RUNTIME_H
 
 #include "Flash.h"
+#include "Experiment.h"
 
 class Runtime
 {
@@ -11,6 +12,7 @@ public:
 
 private:
     Flash flash;
+    Experiment experiment;
 };
 
 #endif
