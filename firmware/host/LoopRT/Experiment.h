@@ -1,6 +1,8 @@
 #ifndef LOOPRT_EXPERIMENT_H
 #define LOOPRT_EXPERIMENT_H
 
+#include "Command.h"
+
 class Experiment
 {
 public:
@@ -10,8 +12,7 @@ public:
     void execute();
 
 private:
-
-    void step();
+    Command command;
 };
 
 #endif

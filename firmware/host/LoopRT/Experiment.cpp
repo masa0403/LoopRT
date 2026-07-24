@@ -16,7 +16,7 @@ void Experiment::execute()
 {
     Serial.println("[INFO] Experiment Start");
 
-    step();
+    command.execute();
 
     Serial.println("[INFO] Experiment Finish");
 }
@@ -26,7 +26,3 @@ void Experiment::execute()
  *
  * 現在はダミー命令のみ。
  */
-void Experiment::step()
-{
-    Serial.println("[INFO] Execute Command");
-}
