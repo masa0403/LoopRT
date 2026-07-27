@@ -19,7 +19,7 @@ void Runtime::initialize()
 
 void Runtime::run()
 {
-    experiment.execute();
+    executor.execute(experiment);
 }
 
 void Runtime::shutdown()
