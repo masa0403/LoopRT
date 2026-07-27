@@ -33,6 +33,9 @@ void setup()
     // Runtime開始
     runtime.initialize();
 
+    // ★追加
+    runtime.run();
+
     // Runtime終了
     runtime.shutdown();
 
