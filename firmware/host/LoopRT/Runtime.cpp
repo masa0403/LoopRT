@@ -1,17 +1,30 @@
 #include <Arduino.h>
+
 #include "Runtime.h"
+
+Runtime::Runtime()
+{
+}
+
 void Runtime::initialize()
 {
-    Serial.println("[INFO] Runtime Initialize");
+    Serial.println(F("[INFO] Runtime Initialize"));
 
     flash.initialize();
 
     experiment.initialize();
 
+    executor.initialize();
+}
+
+void Runtime::run()
+{
     experiment.execute();
 }
 
 void Runtime::shutdown()
 {
-    Serial.println("[INFO] Runtime Shutdown");
+    executor.shutdown();
+
+    Serial.println(F("[INFO] Runtime Shutdown"));
 }
