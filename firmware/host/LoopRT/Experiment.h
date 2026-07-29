@@ -1,7 +1,7 @@
 #ifndef LOOPRT_EXPERIMENT_H
 #define LOOPRT_EXPERIMENT_H
 
-#include "Command.h"
+#include "CommandList.h"
 
 class Experiment
 {
@@ -12,7 +12,7 @@ public:
     void execute();
 
 private:
-    Command command;
+    CommandList commands;
 };
 
 #endif
