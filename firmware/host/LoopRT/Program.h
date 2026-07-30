@@ -1,7 +1,7 @@
 #ifndef LOOPRT_COMMANDLIST_H
 #define LOOPRT_COMMANDLIST_H
 
-#include "Command.h"
+#include "CommandReader.h"
 
 class Program
 {
@@ -11,7 +11,7 @@ public:
 
 private:
 
-    Command command;
+    CommandReader reader;
 };
 
 #endif
