@@ -2,5 +2,9 @@
 
 void Program::execute()
 {
-    command.execute();
+    Command* command = reader.read();
+
+    command->execute();
+
+    delete command;
 }
