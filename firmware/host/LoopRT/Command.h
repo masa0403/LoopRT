@@ -2,19 +2,29 @@
 #define LOOPRT_COMMAND_H
 
 /**
- * @brief LoopRTの命令実行クラス
- *
- * 現在はダミー命令のみを実行する。
- * 将来的にはWAITやFLASHなどの命令を実装する。
+ * @brief Commandの種類
+ */
+enum class CommandType
+{
+    None,
+    Delay,
+    GpioWrite,
+};
+
+/**
+ * @brief LoopRTの命令
  */
 class Command
 {
 public:
 
-    /**
-     * @brief 1つの命令を実行する
-     */
+    Command();
+
     void execute();
+
+private:
+
+    CommandType type;
 };
 
 #endif
