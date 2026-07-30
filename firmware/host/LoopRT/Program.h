@@ -3,7 +3,7 @@
 
 #include "Command.h"
 
-class CommandList
+class Program
 {
 public:
 

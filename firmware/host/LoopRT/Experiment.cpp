@@ -16,7 +16,7 @@ void Experiment::execute()
 {
     Serial.println("[INFO] Experiment Start");
 
-    commands.execute();
+    program.execute();
 
     Serial.println("[INFO] Experiment Finish");
 }
