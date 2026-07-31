@@ -15,15 +15,23 @@ commands = [
     "E",
 ]
 
-commands = [
-    "H",
-    "D",
-    "L",
-    "E",
-]
-
 sequence = "\n".join(commands) + "\n"
 
+print("[INFO] Send Command Sequence")
+print(repr(sequence))
+
 ser.write(sequence.encode())
+
+print("[INFO] Waiting for LoopRT result...")
+
+while True:
+    line = ser.readline().decode(errors="replace").strip()
+
+    if line:
+        print(f"[LOOPRT] {line}")
+
+        if line == "[RESULT] OK":
+            print("[RESULT] OK")
+            break
 
 ser.close()
