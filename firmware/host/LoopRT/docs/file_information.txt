@@ -118,13 +118,10 @@ Command削除
 
 現在:
 CommandReaderからCommandを繰り返し取得し、
-End命令まで順番に実行する。
+Endまで順番に実行する。
 
-未実装:
-- Program Counter
-- 命令ループ
-- 複数Command実行
-- 終了命令処理
+実機確認:
+Arduino Nano上でCommand列の実行を確認済み。
 
 
 ========================================
@@ -179,7 +176,8 @@ Executor.shutdown()
 
 
 現在:
-setup()から一度だけ実行される。
+initialize()でArduino D13をOUTPUTとして初期化。
+LoopRT起動時にD13をGPIO出力として初期化する。
 
 
 ========================================
@@ -369,18 +367,21 @@ Command::execute()でCommandTypeに応じた処理を実行する。
 Command(CommandType type) コンストラクタを追加
 
 現在の動作:
-None:
-    "[INFO] Execute Command" を出力
+
+PinHigh:
+- D13をHIGHに設定
+
+PinLow:
+- D13をLOWに設定
 
 Delay:
-    "[INFO] Execute Delay" を出力
+- 1000ms待機
 
-GpioWrite:
-    "[INFO] Execute GPIO Write" を出力
+End:
+- 終了命令として扱う
 
-生成時にCommandTypeを指定可能。
-End判定を提供する。
-
+現在:
+Commandが実際のArduino GPIOを操作可能。
 
 ========================================
 CommandReader.h / CommandReader.cpp
