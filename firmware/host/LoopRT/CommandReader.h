@@ -10,8 +10,6 @@ public:
 
     Command* read();
 
-private:
-    int index;
 };
 
 #endif

@@ -1,25 +1,36 @@
+#include <Arduino.h>
+
 #include "CommandReader.h"
 #include "Command.h"
 
 CommandReader::CommandReader()
-    : index(0)
 {
 }
 
 Command* CommandReader::read()
 {
-    switch (index++)
+    while (Serial.available() == 0)
     {
-        case 0:
+        ;
+    }
+
+    char input = Serial.read();
+
+    switch (input)
+    {
+        case 'H':
             return new Command(CommandType::PinHigh);
 
-        case 1:
+        case 'D':
             return new Command(CommandType::Delay);
 
-        case 2:
+        case 'L':
             return new Command(CommandType::PinLow);
 
-        default:
+        case 'E':
             return new Command(CommandType::End);
+
+        default:
+            return new Command(CommandType::None);
     }
 }
