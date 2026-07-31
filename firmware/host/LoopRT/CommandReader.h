@@ -9,6 +9,9 @@ public:
     CommandReader();
 
     Command* read();
+
+private:
+    int index;
 };
 
 #endif

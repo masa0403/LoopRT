@@ -1,11 +1,13 @@
-#ifndef LOOPRT_COMMANDLIST_H
-#define LOOPRT_COMMANDLIST_H
+#ifndef LOOPRT_PROGRAM_H
+#define LOOPRT_PROGRAM_H
 
 #include "CommandReader.h"
 
 class Program
 {
 public:
+
+    Program();
 
     void execute();
 

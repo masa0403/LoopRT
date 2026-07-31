@@ -1,10 +1,24 @@
 #include "Program.h"
 
+Program::Program()
+{
+}
+
 void Program::execute()
 {
-    Command* command = reader.read();
+    while (true)
+    {
+        Command* command = reader.read();
 
-    command->execute();
+        command->execute();
 
-    delete command;
+        bool end = command->isEnd();
+
+        delete command;
+
+        if (end)
+        {
+            break;
+        }
+    }
 }

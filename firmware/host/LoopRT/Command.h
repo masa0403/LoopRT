@@ -7,8 +7,10 @@
 enum class CommandType
 {
     None,
+    PinHigh,
+    PinLow,
     Delay,
-    GpioWrite,
+    End
 };
 
 /**
@@ -19,8 +21,11 @@ class Command
 public:
 
     Command();
+    Command(CommandType type);
 
     void execute();
+
+    bool isEnd() const;
 
 private:
 

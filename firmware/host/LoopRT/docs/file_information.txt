@@ -1,0 +1,416 @@
+追記：１ループ開通後、Dispatureの作り込みを行う。
+# Design Decision Record
+
+## Decision: Delay Dispatcher Implementation
+
+Date:
+2026-07-31
+
+Context:
+LoopRT architecture discussion identified that Command Dispatcher separation
+provides better long-term scalability.
+
+However, current development priority is achieving the first complete execution
+loop as soon as possible.
+
+Decision:
+Dispatcher implementation is intentionally postponed.
+
+Until First Loop completion:
+- Executor directly interprets CommandType.
+- Command execution logic remains inside Executor.
+- No Handler abstraction is introduced.
+
+After First Loop completion:
+Revisit this design point and implement:
+
+Command
+  |
+Dispatcher
+  |
+Handler
+  |
+Hardware Driver
+
+Reason:
+Prioritize functional validation and developer momentum over premature abstraction.
+
+========================================
+Flash.h / Flash.cpp
+========================================
+
+役割
+LoopRTの記憶領域を抽象化するクラス。
+
+現在はFlash操作のインターフェースのみ存在し、
+実際の書き込み処理は未実装。
+
+クラス
+Flash
+
+公開関数:
+- initialize()
+- write()
+
+処理:
+
+initialize()
+↓
+"[INFO] Flash Initialize" 出力
+
+write()
+↓
+"[INFO] Flash Write" 出力
+
+
+責務:
+- Flashへのアクセス管理
+
+現在:
+Flash読み込み機能は未実装。
+
+未実装:
+- read()
+- 命令データ保存
+- 命令データ取得
+- Flashアドレス管理
+
+
+========================================
+Program.h / Program.cpp
+========================================
+
+役割
+LoopRTのプログラム実行を担当する。
+
+CommandReaderからCommandを取得し、
+Commandを実行する。
+
+クラス
+Program
+
+保持:
+- CommandReader reader
+
+公開関数:
+- execute()
+
+処理:
+
+execute()
+↓
+CommandReader.read()
+↓
+Command取得
+↓
+Command.execute()
+↓
+Command削除
+
+責務:
+- Command取得
+- Command実行
+- Program終了判定
+
+依存:
+- CommandReader
+- Command
+
+現在:
+CommandReaderからCommandを繰り返し取得し、
+End命令まで順番に実行する。
+
+未実装:
+- Program Counter
+- 命令ループ
+- 複数Command実行
+- 終了命令処理
+
+
+========================================
+Runtime.h / Runtime.cpp
+========================================
+
+役割
+LoopRT全体のライフサイクル管理。
+
+RuntimeはLoopRT全体で1つだけ存在する。
+
+クラス
+Runtime
+
+保持:
+- Flash flash
+- Experiment experiment
+- Executor executor
+
+公開関数:
+- Runtime()
+- initialize()
+- run()
+- shutdown()
+
+
+処理:
+
+initialize()
+↓
+Flash.initialize()
+↓
+Experiment.initialize()
+↓
+Executor.initialize()
+
+
+run()
+↓
+Executor.execute(experiment)
+
+
+shutdown()
+↓
+Executor.shutdown()
+
+
+責務:
+- 各コンポーネントの初期化
+- 実行開始
+- 終了処理
+
+
+現在:
+setup()から一度だけ実行される。
+
+
+========================================
+LoopRT.ino
+========================================
+
+役割
+Arduino起動時のエントリーポイント。
+
+Runtimeを生成し、
+LoopRT全体を開始する。
+
+
+処理:
+
+Arduino起動
+↓
+setup()
+↓
+Serial開始
+↓
+Runtime.initialize()
+↓
+Runtime.run()
+↓
+Runtime.shutdown()
+
+
+グローバル:
+Runtime runtime
+
+
+現在:
+setup()終了後はloop()で処理なし。
+
+
+未実装:
+- 常駐ループ処理
+- イベント待機
+- 外部入力処理
+
+
+========================================
+Executor.h / Executor.cpp
+========================================
+
+役割
+Experimentを実行する実行管理クラス。
+
+Runtimeから呼び出され、
+Experimentのライフサイクル実行を担当する。
+
+クラス
+Executor
+
+公開関数:
+- Executor()
+- initialize()
+- execute(Experiment& experiment)
+- shutdown()
+
+処理:
+
+initialize()
+↓
+Executor初期化ログ出力
+
+execute()
+↓
+"[INFO] Execute Experiment" 出力
+↓
+Experiment.execute() 呼び出し
+
+shutdown()
+↓
+Executor終了ログ出力
+
+
+責務:
+- Experiment実行の管理
+
+保持:
+なし
+
+依存:
+- Experiment
+
+現在:
+単一Experimentを実行するのみ。
+
+未実装:
+- 複数Experiment管理
+- 実行状態管理
+- エラー処理
+- 実行制御
+
+
+========================================
+Experiment.h / Experiment.cpp
+========================================
+
+役割
+LoopRTで実行する1つの実験単位を管理する。
+
+ExperimentはProgramを保持し、
+Programの実行開始・終了を管理する。
+
+クラス
+Experiment
+
+保持:
+- Program program
+
+公開関数:
+- initialize()
+- execute()
+
+処理:
+
+initialize()
+↓
+Experiment初期化ログ出力
+
+
+execute()
+↓
+"[INFO] Experiment Start" 出力
+↓
+Program.execute()
+↓
+"[INFO] Experiment Finish" 出力
+
+
+責務:
+- 実験単位の管理
+- Program実行の呼び出し
+
+依存:
+- Program
+
+
+現在:
+1つのProgramのみ実行。
+
+未実装:
+- 複数Program管理
+- 実験条件管理
+- 実験結果管理
+- 実行状態管理
+
+
+========================================
+Command.h / Command.cpp
+========================================
+
+役割
+- Command種類を保持
+- execute()で種類に応じた処理を実行
+
+現在はCommand自身が命令データと実行処理を保持している。
+
+定義
+
+- CommandType
+  - PinHigh
+  - PinLow
+  - Delay
+  - End
+
+クラス
+Command
+
+保持:
+- CommandType type
+
+初期状態:
+CommandType::None
+
+公開関数:
+- Command()
+- Command(CommandType type)
+- execute()
+- isEnd()
+
+処理:
+Command::execute()でCommandTypeに応じた処理を実行する。
+Command(CommandType type) コンストラクタを追加
+
+現在の動作:
+None:
+    "[INFO] Execute Command" を出力
+
+Delay:
+    "[INFO] Execute Delay" を出力
+
+GpioWrite:
+    "[INFO] Execute GPIO Write" を出力
+
+生成時にCommandTypeを指定可能。
+End判定を提供する。
+
+
+========================================
+CommandReader.h / CommandReader.cpp
+========================================
+
+役割
+命令(Command)を取得するためのインターフェース。
+
+現在、固定Programを返す。
+
+クラス
+int index
+CommandReader
+
+公開関数:
+- read()
+
+返却順:
+
+0 PinHigh
+1 Delay
+2 PinLow
+3 End
+
+現在:
+read()呼び出し毎に固定のCommand列を返す。
+
+未実装:
+- Flash読み込み
+- Program保存領域
+- バイナリCommand読込
+
+将来的にはProgramがCommandを取得する入口になる。
