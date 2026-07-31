@@ -7,6 +7,11 @@ Command::Command()
 {
 }
 
+Command::Command(CommandType type)
+    : type(type)
+{
+}
+
 /**
  * @brief 命令を実行する
  */
@@ -22,8 +27,21 @@ void Command::execute()
             Serial.println(F("[INFO] Execute Delay"));
             break;
 
-        case CommandType::GpioWrite:
-            Serial.println(F("[INFO] Execute GPIO Write"));
+        case CommandType::PinHigh:
+            Serial.println(F("[INFO] Execute Pin High"));
+            break;
+
+        case CommandType::PinLow:
+            Serial.println(F("[INFO] Execute Pin Low"));
+            break;
+
+        case CommandType::End:
+            Serial.println(F("[INFO] Execute End"));
             break;
     }
+}
+
+bool Command::isEnd() const
+{
+    return type == CommandType::End;
 }

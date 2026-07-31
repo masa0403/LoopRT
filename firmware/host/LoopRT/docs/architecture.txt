@@ -1,0 +1,219 @@
+========================================
+LoopRT Architecture
+Version: v0.1
+========================================
+
+
+## Overview
+
+LoopRTはRuntimeを中心として、
+Experimentを実行する組み込み向けランタイム。
+
+現在は起動時に1回だけExperimentを実行する。
+
+
+## System Flow
+
+Boot
+
+↓
+
+Runtime
+
+↓
+
+Executor
+
+↓
+
+Experiment
+
+↓
+
+Program
+
+↓
+
+CommandReader
+
+↓
+
+Command
+
+↓
+
+Command.execute()
+
+
+
+## Component Structure
+
+
+Runtime
+ |
+ |-- Flash
+ |
+ |-- Executor
+ |
+ |-- Experiment
+        |
+        |-- Program
+              |
+              |-- CommandReader
+                    |
+                    |-- Command
+
+
+
+## Component Responsibilities
+
+
+----------------------------------------
+Runtime
+----------------------------------------
+
+LoopRT全体の管理を担当。
+
+責務:
+- 初期化
+- 実行開始
+- 終了処理
+
+所有:
+- Flash
+- Experiment
+- Executor
+
+
+
+----------------------------------------
+Flash
+----------------------------------------
+
+Flash領域へのアクセスを担当。
+
+現在:
+初期化と書き込みインターフェースのみ存在。
+
+
+
+----------------------------------------
+Executor
+----------------------------------------
+
+Experimentの実行制御を担当。
+
+責務:
+- Experiment呼び出し
+- 実行開始/終了管理
+
+
+
+----------------------------------------
+Experiment
+----------------------------------------
+
+1つの実験単位を管理。
+
+責務:
+- Program実行管理
+
+
+
+========================================
+Program
+========================================
+
+変更:
+
+execute()
+
+while (true)
+    ↓
+CommandReader.read()
+    ↓
+Command取得
+    ↓
+Command.execute()
+    ↓
+終了命令なら終了
+    ↓
+Command削除
+
+現在:
+複数Commandを順番に実行可能になった。
+
+未実装:
+- Program Counter
+- Flash読込
+- 実Command実行
+
+
+
+----------------------------------------
+CommandReader
+----------------------------------------
+
+Command取得を担当。
+
+現在:
+固定Commandを生成する。
+
+
+----------------------------------------
+Command
+----------------------------------------
+
+LoopRTの命令を表現する。
+
+現在:
+命令種類を保持し、
+自身のexecute()で処理を実行する。
+
+
+
+## Current Execution Sequence
+
+
+1. Arduino起動
+
+2. Runtime生成
+
+3. Runtime.initialize()
+
+    Flash.initialize()
+
+    Experiment.initialize()
+
+    Executor.initialize()
+
+
+4. Runtime.run()
+
+    Executor.execute()
+
+        Experiment.execute()
+
+            Program.execute()
+
+                CommandReader.read()
+
+                    Command生成
+
+                Command.execute()
+
+
+5. Runtime.shutdown()
+
+    Executor.shutdown()
+
+
+
+## Current State
+
+- Runtimeは1つだけ存在する
+- Experimentは1つのProgramを保持する
+- Programは1つのCommandを取得して実行する
+- CommandReaderはFlashを使用していない
+- Flashからの命令読み出しは未実装
+- loop()では処理を行っていない
