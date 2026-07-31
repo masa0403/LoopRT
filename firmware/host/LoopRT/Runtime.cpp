@@ -10,6 +10,8 @@ void Runtime::initialize()
 {
     Serial.println(F("[INFO] Runtime Initialize"));
 
+    pinMode(13, OUTPUT);
+
     flash.initialize();
 
     experiment.initialize();

@@ -23,16 +23,19 @@ void Command::execute()
             Serial.println(F("[INFO] Execute Command"));
             break;
 
-        case CommandType::Delay:
-            Serial.println(F("[INFO] Execute Delay"));
-            break;
-
         case CommandType::PinHigh:
             Serial.println(F("[INFO] Execute Pin High"));
+            digitalWrite(13, HIGH);
             break;
 
         case CommandType::PinLow:
             Serial.println(F("[INFO] Execute Pin Low"));
+            digitalWrite(13, LOW);
+            break;
+
+        case CommandType::Delay:
+            Serial.println(F("[INFO] Execute Delay"));
+            delay(1000);
             break;
 
         case CommandType::End:
