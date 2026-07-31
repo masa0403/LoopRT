@@ -160,60 +160,34 @@ Command取得を担当。
 固定Commandを生成する。
 
 
-----------------------------------------
-Command
-----------------------------------------
+========================================
+Command Execution
+========================================
 
-LoopRTの命令を表現する。
+現在の実行経路:
+
+Runtime
+↓
+Executor
+↓
+Experiment
+↓
+Program
+↓
+CommandReader
+↓
+Command
+↓
+Arduino GPIO
+
+Commandの実行:
+- PinHigh: Arduino D13をHIGH
+- PinLow: Arduino D13をLOW
+- Delay: 1000ms待機
+- End: Program終了
 
 現在:
-命令種類を保持し、
-自身のexecute()で処理を実行する。
+Commandが実際のArduinoハードウェアを操作可能。
 
-
-
-## Current Execution Sequence
-
-
-1. Arduino起動
-
-2. Runtime生成
-
-3. Runtime.initialize()
-
-    Flash.initialize()
-
-    Experiment.initialize()
-
-    Executor.initialize()
-
-
-4. Runtime.run()
-
-    Executor.execute()
-
-        Experiment.execute()
-
-            Program.execute()
-
-                CommandReader.read()
-
-                    Command生成
-
-                Command.execute()
-
-
-5. Runtime.shutdown()
-
-    Executor.shutdown()
-
-
-
-## Current State
-
-- Runtimeは1つだけ存在する
-- Experimentは1つのProgramを保持する
-- Programは1つのCommandを取得して実行する
-- CommandReaderはFlashを使用していない
-- Flashからの命令読み出しは未実装
-- loop()では処理を行っていない
+First Hardware Execution:
+Arduino Nano D13 onboard LEDによるGPIO動作確認済み。
