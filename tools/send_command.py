@@ -15,8 +15,15 @@ commands = [
     "E",
 ]
 
-for command in commands:
-    ser.write((command + "\n").encode())
-    time.sleep(0.1)
+commands = [
+    "H",
+    "D",
+    "L",
+    "E",
+]
+
+sequence = "\n".join(commands) + "\n"
+
+ser.write(sequence.encode())
 
 ser.close()
