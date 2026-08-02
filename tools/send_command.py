@@ -9,6 +9,12 @@ ser = serial.Serial(PORT, BAUDRATE, timeout=1)
 time.sleep(2)
 
 commands = [
+    "H",
+    "D",
+    "L",
+    "D",
+    "H",
+    "D",
     "L",
     "E",
 ]
