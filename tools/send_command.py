@@ -9,8 +9,6 @@ ser = serial.Serial(PORT, BAUDRATE, timeout=1)
 time.sleep(2)
 
 commands = [
-    "H",
-    "D",
     "L",
     "E",
 ]
@@ -30,8 +28,8 @@ while True:
     if line:
         print(f"[LOOPRT] {line}")
 
-        if line == "[RESULT] OK":
-            print("[RESULT] OK")
+        if line.startswith("[RESULT]"):
+            print(line)
             break
 
 ser.close()
