@@ -1,3 +1,23 @@
+[必須]
+✓ Python → LoopRT
+✓ Command実行
+✓ GPIO操作
+✓ GPIO観測
+□ Target Flash
+□ Target GPIO observation
+□ GPIO result dictionary
+□ PASS/FAIL判定
+□ PWM
+□ ADC
+
+[後回し]
+□ Dispatcher
+□ 複雑なtimeline engine
+□ 高精度同期
+□ STM32対応
+□ CH32対応
+□ Plugin architecture （LoopRTに後から追加するための各種MCU用プラグイン）
+
 ========================================
 LoopRT Architecture
 Version: v0.1
@@ -191,3 +211,36 @@ Commandが実際のArduinoハードウェアを操作可能。
 
 First Hardware Execution:
 Arduino Nano D13 onboard LEDによるGPIO動作確認済み。
+
+========================================
+External Command Input
+========================================
+
+現在:
+
+Python
+↓
+Serial
+↓
+CommandReader
+↓
+Program
+↓
+Command
+↓
+Arduino Hardware
+
+CommandReader:
+- Serialから1文字のCommandを受信
+- H = PinHigh
+- D = Delay
+- L = PinLow
+- E = End
+- CR/LFは無視
+
+現在:
+PythonからLoopRTへCommandを送信し、
+Arduino NanoのD13を実機操作できる。
+
+確認済み:
+Python → Nano D13 LED ON/OFF

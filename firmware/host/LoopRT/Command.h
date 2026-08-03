@@ -25,7 +25,7 @@ public:
 
     void execute();
 
-    bool isEnd() const;
+    bool isEnd();
 
 private:
 

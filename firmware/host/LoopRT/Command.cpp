@@ -23,19 +23,19 @@ void Command::execute()
             Serial.println(F("[INFO] Execute Command"));
             break;
 
+        case CommandType::Delay:
+            delay(1000);
+            Serial.println(F("[INFO] Execute Delay"));
+            break;
+
         case CommandType::PinHigh:
-            Serial.println(F("[INFO] Execute Pin High"));
             digitalWrite(13, HIGH);
+            Serial.println(F("[INFO] Execute Pin High"));
             break;
 
         case CommandType::PinLow:
-            Serial.println(F("[INFO] Execute Pin Low"));
             digitalWrite(13, LOW);
-            break;
-
-        case CommandType::Delay:
-            Serial.println(F("[INFO] Execute Delay"));
-            delay(1000);
+            Serial.println(F("[INFO] Execute Pin Low"));
             break;
 
         case CommandType::End:
@@ -44,7 +44,10 @@ void Command::execute()
     }
 }
 
-bool Command::isEnd() const
+/**
+ * @brief Commandが終了命令か判定する
+ */
+bool Command::isEnd()
 {
     return type == CommandType::End;
 }

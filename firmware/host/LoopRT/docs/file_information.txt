@@ -184,8 +184,10 @@ LoopRT起動時にD13をGPIO出力として初期化する。
 LoopRT.ino
 ========================================
 
-役割
-Arduino起動時のエントリーポイント。
+新規
+
+役割:
+LoopRTへSerial経由でCommandを送信する。
 
 Runtimeを生成し、
 LoopRT全体を開始する。
@@ -211,7 +213,8 @@ Runtime runtime
 
 
 現在:
-setup()終了後はloop()で処理なし。
+H → D → L → E のCommand列を送信し、
+Arduino Nano D13 LEDの動作を確認済み。
 
 
 未実装:
@@ -396,18 +399,22 @@ CommandReader.h / CommandReader.cpp
 int index
 CommandReader
 
-公開関数:
-- read()
+変更
 
-返却順:
+read():
+- Serial入力を待機
+- 受信文字をCommandへ変換
+- CR/LFは無視
 
-0 PinHigh
-1 Delay
-2 PinLow
-3 End
+Command mapping:
+- H → PinHigh
+- D → Delay
+- L → PinLow
+- E → End
 
 現在:
-read()呼び出し毎に固定のCommand列を返す。
+Python / Serial MonitorからCommandを受信可能。
+
 
 未実装:
 - Flash読み込み

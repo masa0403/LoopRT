@@ -1,7 +1,6 @@
 #ifndef LOOPRT_RUNTIME_H
 #define LOOPRT_RUNTIME_H
 
-#include "Flash.h"
 #include "Experiment.h"
 #include "Executor.h"
 
@@ -15,7 +14,6 @@ public:
     void shutdown();
 
 private:
-    Flash flash;
     Experiment experiment;
     Executor executor;
 };

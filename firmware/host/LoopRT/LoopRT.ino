@@ -13,14 +13,15 @@ Runtime runtime;
  */
 void setup()
 {
-    // シリアル通信開始
     Serial.begin(115200);
 
-    // シリアルモニタの接続待ち
     while (!Serial)
     {
         ;
     }
+
+    pinMode(13, OUTPUT);
+    digitalWrite(13, LOW);
 
     Serial.println();
     Serial.println("================================");
@@ -30,13 +31,10 @@ void setup()
 
     Serial.println("[INFO] Boot");
 
-    // Runtime開始
     runtime.initialize();
 
-    // ★追加
     runtime.run();
 
-    // Runtime終了
     runtime.shutdown();
 
     Serial.println();
@@ -45,8 +43,6 @@ void setup()
 
 /**
  * Arduinoはsetup()終了後、この関数を永久に実行する。
- *
- * 現在のLoopRTには処理はない。
  */
 void loop()
 {

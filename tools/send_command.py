@@ -1,12 +1,7 @@
-import serial
-import time
+from looprt import send_commands
+
 
 PORT = "/dev/ttyUSB0"
-BAUDRATE = 115200
-
-ser = serial.Serial(PORT, BAUDRATE, timeout=1)
-
-time.sleep(2)
 
 commands = [
     "H",
@@ -19,23 +14,6 @@ commands = [
     "E",
 ]
 
-sequence = "\n".join(commands) + "\n"
+result = send_commands(PORT, commands)
 
-print("[INFO] Send Command Sequence")
-print(repr(sequence))
-
-ser.write(sequence.encode())
-
-print("[INFO] Waiting for LoopRT result...")
-
-while True:
-    line = ser.readline().decode(errors="replace").strip()
-
-    if line:
-        print(f"[LOOPRT] {line}")
-
-        if line.startswith("[RESULT]"):
-            print(line)
-            break
-
-ser.close()
+print(result)
