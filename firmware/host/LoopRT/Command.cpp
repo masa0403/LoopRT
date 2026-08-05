@@ -29,12 +29,12 @@ void Command::execute()
             break;
 
         case CommandType::PinHigh:
-            digitalWrite(13, HIGH);
+            digitalWrite(8, HIGH);
             Serial.println(F("[INFO] Execute Pin High"));
             break;
 
         case CommandType::PinLow:
-            digitalWrite(13, LOW);
+            digitalWrite(8, LOW);
             Serial.println(F("[INFO] Execute Pin Low"));
             break;
 

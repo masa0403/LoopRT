@@ -1,49 +1,56 @@
 #include "Runtime.h"
 
 /**
- * RuntimeはLoopRT全体で一つだけ存在する。
- *
- * 将来的には実験状態や設定などを保持するため、
- * グローバルで生成しておく。
- */
-Runtime runtime;
+
+* RuntimeはLoopRT全体で一つだけ存在する。
+*
+* 将来的には実験状態や設定などを保持するため、
+* グローバルで生成しておく。
+  */
+  Runtime runtime;
 
 /**
- * Arduino起動時に一度だけ実行される。
- */
-void setup()
-{
-    Serial.begin(115200);
 
-    while (!Serial)
-    {
-        ;
-    }
+* Arduino起動時に一度だけ実行される。
+  */
+  void setup()
+  {
+  Serial.begin(115200);
 
-    pinMode(13, OUTPUT);
-    digitalWrite(13, LOW);
+  while (!Serial)
+  {
+  ;
+  }
 
-    Serial.println();
-    Serial.println("================================");
-    Serial.println("LoopRT v0.1");
-    Serial.println("================================");
-    Serial.println();
+  pinMode(13, OUTPUT);
+  digitalWrite(13, LOW);
 
-    Serial.println("[INFO] Boot");
+  Serial.println();
+  Serial.println("================================");
+  Serial.println("LoopRT v0.1");
+  Serial.println("================================");
+  Serial.println();
 
-    runtime.initialize();
+  Serial.println("[INFO] Boot");
 
-    runtime.run();
+  runtime.initialize();
 
-    runtime.shutdown();
+  /*
 
-    Serial.println();
+  * LoopRTがPCからの実験命令を
+  * 受信できる状態になったことを通知する。
+    */
     Serial.println("LoopRT Ready");
-}
+
+  runtime.run();
+
+  runtime.shutdown();
+  }
 
 /**
- * Arduinoはsetup()終了後、この関数を永久に実行する。
- */
-void loop()
-{
-}
+
+* Arduinoはsetup()終了後、この関数を永久に実行する。
+  */
+  void loop()
+  {
+  }
