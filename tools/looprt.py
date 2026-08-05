@@ -1,11 +1,21 @@
 import serial
-import time
-
 
 def send_commands(port, commands, baudrate=115200):
     ser = serial.Serial(port, baudrate, timeout=1)
 
-    time.sleep(2)
+
+    print("[INFO] Waiting for LoopRT Ready...")
+
+    while True:
+        line = ser.readline().decode(errors="replace").strip()
+
+        if not line:
+            continue
+
+        print(f"[LOOPRT] {line}")
+
+        if line == "LoopRT Ready":
+            break
 
     sequence = "\n".join(commands) + "\n"
 
@@ -19,12 +29,14 @@ def send_commands(port, commands, baudrate=115200):
     while True:
         line = ser.readline().decode(errors="replace").strip()
 
-        if line:
-            print(f"[LOOPRT] {line}")
+        if not line:
+            continue
 
-            if line.startswith("[RESULT]"):
-                result = line
-                ser.close()
-                return result
+        print(f"[LOOPRT] {line}")
+
+        if line.startswith("[RESULT]"):
+            ser.close()
+            return line
 
     ser.close()
+
