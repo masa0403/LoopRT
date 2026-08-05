@@ -9,7 +9,7 @@ public:
 
     void initialize();
 
-    void execute();
+    void execute(Observer& observer);
 
 private:
     Program program;

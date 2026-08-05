@@ -2,6 +2,7 @@
 #define LOOPRT_EXECUTOR_H
 
 #include "Experiment.h"
+#include "Observer.h"
 
 class Executor
 {
@@ -11,7 +12,7 @@ public:
 
     void initialize();
 
-    void execute(Experiment& experiment);
+    void execute(Experiment& experiment, Observer& observer);
 
     void shutdown();
 };

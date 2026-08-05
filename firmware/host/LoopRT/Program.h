@@ -2,6 +2,7 @@
 #define LOOPRT_PROGRAM_H
 
 #include "CommandReader.h"
+#include "Observer.h"
 
 class Program
 {
@@ -9,7 +10,7 @@ public:
 
     Program();
 
-    void execute();
+    void execute(Observer& observer);
 
 private:
 

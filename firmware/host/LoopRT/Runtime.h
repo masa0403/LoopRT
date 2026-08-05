@@ -3,19 +3,21 @@
 
 #include "Experiment.h"
 #include "Executor.h"
+#include "Observer.h"
 
 class Runtime
 {
 public:
-    Runtime();
+Runtime();
 
-    void initialize();
-    void run();
-    void shutdown();
+void initialize();
+void run();
+void shutdown();
 
 private:
-    Experiment experiment;
-    Executor executor;
+Experiment experiment;
+Executor executor;
+Observer observer;
 };
 
 #endif

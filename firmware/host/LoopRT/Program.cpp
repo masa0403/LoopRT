@@ -6,7 +6,7 @@ Program::Program()
 {
 }
 
-void Program::execute()
+void Program::execute(Observer& observer)
 {
     while (true)
     {
@@ -14,23 +14,16 @@ void Program::execute()
 
         command->execute();
 
+        // Command実行直後のTarget MCU状態を観測
+        observer.readPin(7);
+
         bool end = command->isEnd();
 
         delete command;
 
         if (end)
         {
-            int state = digitalRead(13);
-
-            if (state == HIGH)
-            {
-                Serial.println(F("[RESULT] D13 HIGH"));
-            }
-            else
-            {
-                Serial.println(F("[RESULT] D13 LOW"));
-            }
-
+            Serial.println(F("[RESULT] OK"));
             break;
         }
     }
