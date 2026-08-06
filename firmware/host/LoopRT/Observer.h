@@ -2,18 +2,17 @@
 #define LOOPRT_OBSERVER_H
 
 /**
+ * @brief Target MCUの状態を観測する
+ */
+class Observer
+{
+public:
 
-* @brief Target MCUの状態を観測する
-  */
-  class Observer
-  {
-  public:
+    Observer();
 
-  Observer();
+    void initialize();
 
-  void initialize();
-
-  int readPin(int pin);
-  };
+    int readPin();
+};
 
 #endif

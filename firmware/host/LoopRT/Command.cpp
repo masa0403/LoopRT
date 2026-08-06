@@ -1,6 +1,7 @@
 #include <Arduino.h>
 
 #include "Command.h"
+#include "PinConfig.h"
 
 Command::Command()
     : type(CommandType::None)
@@ -29,12 +30,12 @@ void Command::execute()
             break;
 
         case CommandType::PinHigh:
-            digitalWrite(8, HIGH);
+            digitalWrite(PinConfig::EXECUTOR_PIN, HIGH);
             Serial.println(F("[INFO] Execute Pin High"));
             break;
 
         case CommandType::PinLow:
-            digitalWrite(8, LOW);
+            digitalWrite(PinConfig::EXECUTOR_PIN, LOW);
             Serial.println(F("[INFO] Execute Pin Low"));
             break;
 

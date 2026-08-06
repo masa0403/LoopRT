@@ -1,40 +1,39 @@
 #include <Arduino.h>
 
 #include "Observer.h"
+#include "PinConfig.h"
 
 Observer::Observer()
 {
 }
 
 /**
-
-* @brief Observerを初期化する
-  */
-  void Observer::initialize()
-  {
-  Serial.println(F("[INFO] Observer Initialize"));
-  }
+ * @brief Observerを初期化する
+ */
+void Observer::initialize()
+{
+    Serial.println(F("[INFO] Observer Initialize"));
+}
 
 /**
+ * @brief Observer対象ピンの状態を読む
+ */
+int Observer::readPin()
+{
+    int state = digitalRead(PinConfig::OBSERVER_PIN);
 
-* @brief 指定したピンの状態を読む
-  */
-  int Observer::readPin(int pin)
-  {
-  int state = digitalRead(pin);
+    if (state == HIGH)
+    {
+        Serial.print(F("[OBSERVE] D"));
+        Serial.print(PinConfig::OBSERVER_PIN);
+        Serial.println(F(" HIGH"));
+    }
+    else
+    {
+        Serial.print(F("[OBSERVE] D"));
+        Serial.print(PinConfig::OBSERVER_PIN);
+        Serial.println(F(" LOW"));
+    }
 
-  if (state == HIGH)
-  {
-  Serial.print(F("[OBSERVE] D"));
-  Serial.print(pin);
-  Serial.println(F(" HIGH"));
-  }
-  else
-  {
-  Serial.print(F("[OBSERVE] D"));
-  Serial.print(pin);
-  Serial.println(F(" LOW"));
-  }
-
-  return state;
-  }
+    return state;
+}

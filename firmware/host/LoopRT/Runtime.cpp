@@ -1,6 +1,7 @@
 #include <Arduino.h>
 
 #include "Runtime.h"
+#include "PinConfig.h"
 
 Runtime::Runtime()
 {
@@ -8,29 +9,26 @@ Runtime::Runtime()
 
 void Runtime::initialize()
 {
-Serial.println(F("[INFO] Runtime Initialize"));
+    Serial.println(F("[INFO] Runtime Initialize"));
 
-experiment.initialize();
+    experiment.initialize();
 
-executor.initialize();
+    executor.initialize();
 
-observer.initialize();
-
+    observer.initialize();
 }
 
 void Runtime::run()
 {
-    // D7 = Target MCU PA3からの観測入力
-    pinMode(7, INPUT);
-    pinMode(8, OUTPUT);
+    pinMode(PinConfig::OBSERVER_PIN, INPUT);
+    pinMode(PinConfig::EXECUTOR_PIN, OUTPUT);
 
     executor.execute(experiment, observer);
 }
 
 void Runtime::shutdown()
 {
-executor.shutdown();
+    executor.shutdown();
 
-Serial.println(F("[INFO] Runtime Shutdown"));
-
+    Serial.println(F("[INFO] Runtime Shutdown"));
 }

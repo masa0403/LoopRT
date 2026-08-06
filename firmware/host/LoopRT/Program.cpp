@@ -15,7 +15,7 @@ void Program::execute(Observer& observer)
         command->execute();
 
         // Command実行直後のTarget MCU状態を観測
-        observer.readPin(7);
+        observer.readPin();
 
         bool end = command->isEnd();
 
