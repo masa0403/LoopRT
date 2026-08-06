@@ -19,7 +19,7 @@ void Observer::initialize()
  * @brief Observer対象ピンの状態を読む
  */
 
-/**
+
 int Observer::readPin()
 {
     int state = digitalRead(PinConfig::OBSERVER_PIN);
@@ -39,23 +39,7 @@ int Observer::readPin()
 
     return state;
 }
-*/
 
-int Observer::readPin()
-{
-    int state = digitalRead(7);
-
-    if (state == HIGH)
-    {
-        Serial.println(F("[OBSERVE] D7 HIGH"));
-    }
-    else
-    {
-        Serial.println(F("[OBSERVE] D7 LOW"));
-    }
-
-    return state;
-}
 
 void Observer::observePwm()
 {
