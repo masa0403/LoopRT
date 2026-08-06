@@ -1,5 +1,12 @@
+#LoopRT/tools/target.py
 from pathlib import Path
 import sys
+from nano_flash import (
+    compile_nano_sketch,
+    upload_nano_sketch,
+)
+
+from nano_port import detect_nano_port
 
 
 # =========================================================
@@ -34,10 +41,7 @@ if str(EMBLOOP_EMB) not in sys.path:
 # emb-loop の既存機能を利用
 # =========================================================
 
-from host_mcu.code_utility import (
-    load_calib,
-    detect_nano_port,
-)
+from host_mcu.code_utility import load_calib
 
 from host_mcu.compile_flash import (
     compile_avr,
@@ -78,6 +82,18 @@ JTAG2UPDI_HEX = (
     / "JTAG2UPDI.hex"
 )
 
+
+# =========================================================
+# Nano LoopRT firmware
+# =========================================================
+
+LOOPRT_SKETCH = (
+    Path(__file__).resolve().parent.parent
+    / "firmware"
+    / "host"
+    / "LoopRT"
+    / "LoopRT.ino"
+)
 
 
 # =========================================================
@@ -154,3 +170,25 @@ def flash_target():
     print("[INFO] Target Flash Complete")
 
 
+    # ---------------------------------------------------------
+    # Step 5: NanoへLoopRT Flash
+    # ---------------------------------------------------------
+
+    print("[INFO] LoopRT Flash")
+
+    port = detect_nano_port()
+
+    print("[INFO] Compile LoopRT")
+
+    compile_nano_sketch(
+        LOOPRT_SKETCH
+    )
+
+    print("[INFO] Upload LoopRT")
+
+    upload_nano_sketch(
+        LOOPRT_SKETCH,
+        port,
+    )
+
+    print("[INFO] LoopRT Flash Complete")
