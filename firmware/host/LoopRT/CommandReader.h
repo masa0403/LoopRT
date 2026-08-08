@@ -6,10 +6,10 @@
 class CommandReader
 {
 public:
+
     CommandReader();
 
     Command* read();
-
 };
 
 #endif

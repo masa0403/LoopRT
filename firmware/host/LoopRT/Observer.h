@@ -1,5 +1,5 @@
-#ifndef LOOPRT_OBSERVER_H
-#define LOOPRT_OBSERVER_H
+#ifndef OBSERVER_H
+#define OBSERVER_H
 
 class Observer
 {
@@ -9,9 +9,9 @@ public:
 
     void initialize();
 
-    int readPin();
+    int readPin(int pin);
 
-    void observePwm();
+    void observePwm(int pin);
 };
 
 #endif

@@ -4,15 +4,23 @@ from looprt import send_commands
 PORT = "/dev/ttyUSB0"
 
 commands = [
-    "P(25)\n",
-    "D(50)\n",
-    "P(i)\n",
-    "P(50)\n",
-    "D(50)\n",
-    "P(i)\n",
-    "P(75)\n",
-    "D(50)\n",
-    "P(i)\n",
+    "H(8)\n",
+    "D(500)\n",
+    "L(8)\n",
+    "D(500)\n",
+
+    "P(9,25)\n",
+    "D(500)\n",
+    "PI(7)\n",
+
+    "P(9,50)\n",
+    "D(500)\n",
+    "PI(7)\n",
+
+    "P(9,75)\n",
+    "D(500)\n",
+    "PI(7)\n",
+
     "E\n"
 ]
 

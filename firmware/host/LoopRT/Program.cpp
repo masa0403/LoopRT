@@ -16,7 +16,7 @@ void Program::execute(Observer& observer)
 
         if (command->isPwmInput())
         {
-            observer.observePwm();
+            observer.observePwm(command->getPin());
         }
 
         Serial.println(F("[DONE]"));
@@ -32,3 +32,4 @@ void Program::execute(Observer& observer)
         }
     }
 }
+

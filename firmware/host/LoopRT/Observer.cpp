@@ -1,7 +1,6 @@
 #include <Arduino.h>
 
 #include "Observer.h"
-#include "PinConfig.h"
 
 Observer::Observer()
 {
@@ -12,41 +11,50 @@ Observer::Observer()
  */
 void Observer::initialize()
 {
-    Serial.println(F("[INFO] Observer Initialize"));
+    Serial.println(
+        F("[INFO] Observer Initialize")
+    );
 }
 
 /**
- * @brief Observer対象ピンの状態を読む
+ * @brief 指定されたピンの状態を読む
  */
-int Observer::readPin()
+int Observer::readPin(int pin)
 {
-    int state = digitalRead(PinConfig::TARGET_PA2);
+    int state = digitalRead(pin);
+
+    Serial.print(F("[OBSERVE] D"));
+    Serial.print(pin);
 
     if (state == HIGH)
     {
-        Serial.println(F("[OBSERVE] PA2 (D7) HIGH"));
+        Serial.println(F(" HIGH"));
     }
     else
     {
-        Serial.println(F("[OBSERVE] PA2 (D7) LOW"));
+        Serial.println(F(" LOW"));
     }
 
     return state;
 }
 
 /**
- * @brief PWM信号を一定時間連続観測する
+ * @brief 指定されたピンのPWM信号を一定時間観測する
  *
  * 50msの間、PWMの各周期を測定し、
  * Duty / Period / Frequencyの安定性を記録する。
  */
-void Observer::observePwm()
+void Observer::observePwm(int pin)
 {
     const unsigned long OBSERVE_TIME_US = 50000;
     const unsigned long TIMEOUT_US = 100000;
 
-    Serial.println(F("[TARGET] PWM Observe PA2 (D7)"));
-    Serial.println(F("[TARGET] PWM Observation: 50 ms"));
+    Serial.print(F("[TARGET] PWM Observe D"));
+    Serial.println(pin);
+
+    Serial.println(
+        F("[TARGET] PWM Observation: 50 ms")
+    );
 
     // ---------------------------------------------------------
     // 最初のLOWを待つ
@@ -54,11 +62,14 @@ void Observer::observePwm()
 
     unsigned long startWait = micros();
 
-    while (digitalRead(PinConfig::TARGET_PA2) == HIGH)
+    while (digitalRead(pin) == HIGH)
     {
         if (micros() - startWait >= TIMEOUT_US)
         {
-            Serial.println(F("[TARGET] PWM Timeout"));
+            Serial.println(
+                F("[TARGET] PWM Timeout")
+            );
+
             return;
         }
     }
@@ -69,11 +80,14 @@ void Observer::observePwm()
 
     startWait = micros();
 
-    while (digitalRead(PinConfig::TARGET_PA2) == LOW)
+    while (digitalRead(pin) == LOW)
     {
         if (micros() - startWait >= TIMEOUT_US)
         {
-            Serial.println(F("[TARGET] PWM Timeout"));
+            Serial.println(
+                F("[TARGET] PWM Timeout")
+            );
+
             return;
         }
     }
@@ -103,9 +117,13 @@ void Observer::observePwm()
     // 50ms連続観測
     // ---------------------------------------------------------
 
-    unsigned long previousHighStart = observationStart;
+    unsigned long previousHighStart =
+        observationStart;
 
-    while (micros() - observationStart < OBSERVE_TIME_US)
+    while (
+        micros() - observationStart
+        < OBSERVE_TIME_US
+    )
     {
         // -----------------------------------------------------
         // HIGH -> LOW
@@ -113,23 +131,35 @@ void Observer::observePwm()
 
         unsigned long waitStart = micros();
 
-        while (digitalRead(PinConfig::TARGET_PA2) == HIGH)
+        while (digitalRead(pin) == HIGH)
         {
-            if (micros() - observationStart >= OBSERVE_TIME_US)
+            if (
+                micros() - observationStart
+                >= OBSERVE_TIME_US
+            )
             {
                 break;
             }
 
-            if (micros() - waitStart >= TIMEOUT_US)
+            if (
+                micros() - waitStart
+                >= TIMEOUT_US
+            )
             {
-                Serial.println(F("[TARGET] PWM Timeout"));
+                Serial.println(
+                    F("[TARGET] PWM Timeout")
+                );
+
                 return;
             }
         }
 
         unsigned long lowStart = micros();
 
-        if (micros() - observationStart >= OBSERVE_TIME_US)
+        if (
+            micros() - observationStart
+            >= OBSERVE_TIME_US
+        )
         {
             break;
         }
@@ -140,23 +170,35 @@ void Observer::observePwm()
 
         waitStart = micros();
 
-        while (digitalRead(PinConfig::TARGET_PA2) == LOW)
+        while (digitalRead(pin) == LOW)
         {
-            if (micros() - observationStart >= OBSERVE_TIME_US)
+            if (
+                micros() - observationStart
+                >= OBSERVE_TIME_US
+            )
             {
                 break;
             }
 
-            if (micros() - waitStart >= TIMEOUT_US)
+            if (
+                micros() - waitStart
+                >= TIMEOUT_US
+            )
             {
-                Serial.println(F("[TARGET] PWM Timeout"));
+                Serial.println(
+                    F("[TARGET] PWM Timeout")
+                );
+
                 return;
             }
         }
 
         unsigned long nextHighStart = micros();
 
-        if (micros() - observationStart >= OBSERVE_TIME_US)
+        if (
+            micros() - observationStart
+            >= OBSERVE_TIME_US
+        )
         {
             break;
         }
@@ -176,17 +218,14 @@ void Observer::observePwm()
             continue;
         }
 
-        unsigned long lowTime =
-            nextHighStart - lowStart;
-
         float duty =
-            (float)highTime /
-            (float)period *
-            100.0;
+            (float)highTime
+            / (float)period
+            * 100.0;
 
         float frequency =
-            1000000.0 /
-            (float)period;
+            1000000.0
+            / (float)period;
 
         // -----------------------------------------------------
         // 統計値へ追加
@@ -236,7 +275,8 @@ void Observer::observePwm()
 
         cycleCount++;
 
-        previousHighStart = nextHighStart;
+        previousHighStart =
+            nextHighStart;
     }
 
     // ---------------------------------------------------------
@@ -245,7 +285,10 @@ void Observer::observePwm()
 
     if (cycleCount == 0)
     {
-        Serial.println(F("[TARGET] PWM No Signal"));
+        Serial.println(
+            F("[TARGET] PWM No Signal")
+        );
+
         return;
     }
 
@@ -284,9 +327,13 @@ void Observer::observePwm()
     Serial.println(F(" %"));
 
     Serial.print(F("[TARGET] Duty Range: "));
-    Serial.print((dutyMax - dutyMin) / 100);
+    Serial.print(
+        (dutyMax - dutyMin) / 100
+    );
     Serial.print(F("."));
-    Serial.print((dutyMax - dutyMin) % 100);
+    Serial.print(
+        (dutyMax - dutyMin) % 100
+    );
     Serial.println(F(" %"));
 
     Serial.print(F("[TARGET] Period Avg: "));
@@ -319,4 +366,3 @@ void Observer::observePwm()
     Serial.print(frequencyMax % 100);
     Serial.println(F(" Hz"));
 }
-

@@ -1,22 +1,28 @@
 #include <Arduino.h>
 
 #include "Command.h"
-#include "PinConfig.h"
 
 Command::Command()
     : type(CommandType::None),
+      pin(0),
       value(0)
 {
 }
 
 Command::Command(CommandType type)
     : type(type),
+      pin(0),
       value(0)
 {
 }
 
-Command::Command(CommandType type, int value)
+Command::Command(
+    CommandType type,
+    int pin,
+    int value
+)
     : type(type),
+      pin(pin),
       value(value)
 {
 }
@@ -29,51 +35,102 @@ void Command::execute()
     switch (type)
     {
         case CommandType::None:
+
             Serial.println(F("[INFO] Execute Command"));
+
             break;
 
+
         case CommandType::Delay:
+
             Serial.print(F("[INFO] Execute Delay: "));
             Serial.print(value);
             Serial.println(F(" ms"));
 
             delay(value);
+
             break;
+
 
         case CommandType::PinHigh:
-            pinMode(PinConfig::TARGET_PA3, OUTPUT);
-            digitalWrite(PinConfig::TARGET_PA3, HIGH);
 
-            Serial.println(F("[HOST] GPIO PA3 (D8) HIGH"));
+            pinMode(pin, OUTPUT);
+
+            digitalWrite(
+                pin,
+                HIGH
+            );
+
+            Serial.print(F("[HOST] GPIO D"));
+            Serial.print(pin);
+            Serial.println(F(" HIGH"));
+
             break;
+
 
         case CommandType::PinLow:
-            pinMode(PinConfig::TARGET_PA3, OUTPUT);
-            digitalWrite(PinConfig::TARGET_PA3, LOW);
 
-            Serial.println(F("[HOST] GPIO PA3 (D8) LOW"));
+            pinMode(pin, OUTPUT);
+
+            digitalWrite(
+                pin,
+                LOW
+            );
+
+            Serial.print(F("[HOST] GPIO D"));
+            Serial.print(pin);
+            Serial.println(F(" LOW"));
+
             break;
+
 
         case CommandType::Pwm:
         {
-            int pwmValue = map(value, 0, 100, 0, 255);
+            int pwmValue = map(
+                value,
+                0,
+                100,
+                0,
+                255
+            );
 
-            pinMode(PinConfig::TARGET_PA6, OUTPUT);
-            analogWrite(PinConfig::TARGET_PA6, pwmValue);
+            pinMode(
+                pin,
+                OUTPUT
+            );
 
-            Serial.print(F("[HOST] PWM PA6 (D9) "));
+            analogWrite(
+                pin,
+                pwmValue
+            );
+
+            Serial.print(F("[HOST] PWM D"));
+            Serial.print(pin);
+            Serial.print(F(" "));
             Serial.print(value);
             Serial.println(F("%"));
 
             break;
         }
 
+
         case CommandType::PwmInput:
-            Serial.println(F("[INFO] Execute PWM Input Observe"));
+
+            Serial.print(
+                F("[INFO] Execute PWM Input Observe D")
+            );
+
+            Serial.println(pin);
+
             break;
 
+
         case CommandType::End:
-            Serial.println(F("[INFO] Execute End"));
+
+            Serial.println(
+                F("[INFO] Execute End")
+            );
+
             break;
     }
 }
@@ -94,3 +151,7 @@ bool Command::isPwmInput()
     return type == CommandType::PwmInput;
 }
 
+int Command::getPin() const
+{
+    return pin;
+}

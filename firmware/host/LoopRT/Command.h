@@ -1,9 +1,6 @@
-#ifndef LOOPRT_COMMAND_H
-#define LOOPRT_COMMAND_H
+#ifndef COMMAND_H
+#define COMMAND_H
 
-/**
- * @brief Commandの種類
- */
 enum class CommandType
 {
     None,
@@ -15,25 +12,34 @@ enum class CommandType
     End
 };
 
-/**
- * @brief LoopRTの命令
- */
 class Command
 {
 public:
 
     Command();
-    Command(CommandType type);
-    Command(CommandType type, int value);
+
+    explicit Command(CommandType type);
+
+    Command(
+        CommandType type,
+        int pin,
+        int value
+    );
 
     void execute();
 
     bool isEnd();
+
     bool isPwmInput();
+
+    int getPin() const;
 
 private:
 
     CommandType type;
+
+    int pin;
+
     int value;
 };
 
