@@ -13,6 +13,12 @@ Command::Command(CommandType type)
 {
 }
 
+Command::Command(CommandType type, int value)
+    : type(type),
+      value(value)
+{
+}
+
 /**
  * @brief 命令を実行する
  */
@@ -30,13 +36,26 @@ void Command::execute()
             break;
 
         case CommandType::PinHigh:
-            digitalWrite(PinConfig::EXECUTOR_PIN, HIGH);
+            digitalWrite(PinConfig::TARGET_CONTROL_PIN, HIGH);
             Serial.println(F("[INFO] Execute Pin High"));
             break;
 
         case CommandType::PinLow:
-            digitalWrite(PinConfig::EXECUTOR_PIN, LOW);
+            digitalWrite(PinConfig::TARGET_CONTROL_PIN, LOW);
             Serial.println(F("[INFO] Execute Pin Low"));
+            break;
+
+        case CommandType::Pwm:
+            int pwmValue = map(value, 0, 100, 0, 255);
+            pinMode(PinConfig::PWM_OUTPUT_PIN, OUTPUT);
+            analogWrite(PinConfig::PWM_OUTPUT_PIN, pwmValue);
+            Serial.print(F("[HOST] PWM D9 "));
+            Serial.print(value);
+            Serial.println(F("%"));
+            break;
+
+        case CommandType::PwmInput:
+            Serial.println(F("[INFO] Execute PWM Input Observe"));
             break;
 
         case CommandType::End:
@@ -51,4 +70,12 @@ void Command::execute()
 bool Command::isEnd()
 {
     return type == CommandType::End;
+}
+
+/**
+ * @brief CommandがPWM入力命令か判定する
+ */
+bool Command::isPwmInput()
+{
+    return type == CommandType::PwmInput;
 }
