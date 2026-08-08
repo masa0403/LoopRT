@@ -8,45 +8,19 @@ from nano_flash import (
 
 from nano_port import detect_nano_port
 
+from code_utility import load_calib
+from calibration import calibrate_attiny202
 
-# =========================================================
-# emb-loop の場所
-# =========================================================
-
-EMBLOOP_ROOT = (
-    Path.home()
-    / "デスクトップ"
-    / "GitHub"
-    / "embloop"
-)
-
-EMBLOOP_EMB = EMBLOOP_ROOT / "emb"
-
-
-# =========================================================
-# emb-loop を Python の import path に追加
-#
-# これにより、
-#
-#     PYTHONPATH=/home/.../embloop/emb
-#
-# を毎回指定する必要がなくなる。
-# =========================================================
-
-if str(EMBLOOP_EMB) not in sys.path:
-    sys.path.insert(0, str(EMBLOOP_EMB))
-
-
-# =========================================================
-# emb-loop の既存機能を利用
-# =========================================================
-
-from host_mcu.code_utility import load_calib
-
-from host_mcu.compile_flash import (
+from compile_flash import (
     compile_avr,
     flash_avr,
 )
+
+# =========================================================
+# LoopRT Root
+# =========================================================
+
+LOOPRT_ROOT = Path(__file__).resolve().parent.parent
 
 
 # =========================================================
@@ -54,18 +28,19 @@ from host_mcu.compile_flash import (
 # =========================================================
 
 TARGET_SOURCE = (
-    EMBLOOP_EMB
-    / "target_mcu"
+    LOOPRT_ROOT
+    / "firmware"
+    / "target"
     / "attiny202"
-    / "codes"
     / "test_202.c"
 )
 
 TARGET_OUTPUT = (
-    EMBLOOP_EMB
-    / "target_mcu"
+    LOOPRT_ROOT
+    / "firmware"
+    / "target"
     / "attiny202"
-    / "codes_compiled"
+    / "build"
 )
 
 
@@ -74,11 +49,9 @@ TARGET_OUTPUT = (
 # =========================================================
 
 JTAG2UPDI_HEX = (
-    EMBLOOP_EMB
-    / "host_mcu"
-    / "host_mcu_codes"
-    / "nano"
-    / "programmer"
+    LOOPRT_ROOT
+    / "firmware"
+    / "host"
     / "JTAG2UPDI.hex"
 )
 
@@ -88,7 +61,7 @@ JTAG2UPDI_HEX = (
 # =========================================================
 
 LOOPRT_SKETCH = (
-    Path(__file__).resolve().parent.parent
+    LOOPRT_ROOT
     / "firmware"
     / "host"
     / "LoopRT"
@@ -129,11 +102,21 @@ def flash_target():
     calib = load_calib()
 
     if "attiny202" not in calib:
-        raise RuntimeError(
-            "ATtiny202のF_CPU calibrationが見つかりません。"
-        )
+        print("[INFO] ATtiny202 F_CPU calibration not found.")
+        print("[INFO] Starting automatic calibration...")
+
+        calibrate_attiny202()
+
+        calib = load_calib()
+
+        if "attiny202" not in calib:
+            raise RuntimeError(
+                "ATtiny202のF_CPU calibrationに失敗しました。"
+            )
 
     f_cpu = f"{calib['attiny202']}UL"
+
+    print(f"[INFO] F_CPU: {f_cpu}")
 
     # ---------------------------------------------------------
     # Step 3: ATtiny202をコンパイル

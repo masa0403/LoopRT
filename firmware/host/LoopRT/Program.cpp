@@ -19,13 +19,15 @@ void Program::execute(Observer& observer)
             observer.observePwm();
         }
 
+        Serial.println(F("[DONE]"));
+
         bool end = command->isEnd();
 
         delete command;
 
         if (end)
         {
-            Serial.println(F("[RESULT] OK"));
+            Serial.println(F("Experiment End"));
             break;
         }
     }

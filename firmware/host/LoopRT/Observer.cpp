@@ -18,23 +18,17 @@ void Observer::initialize()
 /**
  * @brief Observer対象ピンの状態を読む
  */
-
-
 int Observer::readPin()
 {
-    int state = digitalRead(PinConfig::TARGET_OBSERVER_PIN);
+    int state = digitalRead(PinConfig::TARGET_PA2);
 
     if (state == HIGH)
     {
-        Serial.print(F("[OBSERVE] D"));
-        Serial.print(PinConfig::TARGET_OBSERVER_PIN);
-        Serial.println(F(" HIGH"));
+        Serial.println(F("[OBSERVE] PA2 (D7) HIGH"));
     }
     else
     {
-        Serial.print(F("[OBSERVE] D"));
-        Serial.print(PinConfig::TARGET_OBSERVER_PIN);
-        Serial.println(F(" LOW"));
+        Serial.println(F("[OBSERVE] PA2 (D7) LOW"));
     }
 
     return state;
@@ -43,18 +37,16 @@ int Observer::readPin()
 /**
  * @brief PWM信号を一定時間連続観測する
  *
- * 500msの間、PWMの各周期を測定し、
+ * 50msの間、PWMの各周期を測定し、
  * Duty / Period / Frequencyの安定性を記録する。
  */
 void Observer::observePwm()
 {
-    const unsigned long OBSERVE_TIME_US = 500000;
+    const unsigned long OBSERVE_TIME_US = 50000;
     const unsigned long TIMEOUT_US = 100000;
 
-    Serial.print(F("[TARGET] PWM Observe D"));
-    Serial.println(PinConfig::TARGET_OBSERVER_PIN);
-
-    Serial.println(F("[TARGET] PWM Observation: 500 ms"));
+    Serial.println(F("[TARGET] PWM Observe PA2 (D7)"));
+    Serial.println(F("[TARGET] PWM Observation: 50 ms"));
 
     // ---------------------------------------------------------
     // 最初のLOWを待つ
@@ -62,7 +54,7 @@ void Observer::observePwm()
 
     unsigned long startWait = micros();
 
-    while (digitalRead(PinConfig::TARGET_OBSERVER_PIN) == HIGH)
+    while (digitalRead(PinConfig::TARGET_PA2) == HIGH)
     {
         if (micros() - startWait >= TIMEOUT_US)
         {
@@ -77,7 +69,7 @@ void Observer::observePwm()
 
     startWait = micros();
 
-    while (digitalRead(PinConfig::TARGET_OBSERVER_PIN) == LOW)
+    while (digitalRead(PinConfig::TARGET_PA2) == LOW)
     {
         if (micros() - startWait >= TIMEOUT_US)
         {
@@ -108,7 +100,7 @@ void Observer::observePwm()
     unsigned long frequencyMax = 0;
 
     // ---------------------------------------------------------
-    // 500ms連続観測
+    // 50ms連続観測
     // ---------------------------------------------------------
 
     unsigned long previousHighStart = observationStart;
@@ -121,7 +113,7 @@ void Observer::observePwm()
 
         unsigned long waitStart = micros();
 
-        while (digitalRead(PinConfig::TARGET_OBSERVER_PIN) == HIGH)
+        while (digitalRead(PinConfig::TARGET_PA2) == HIGH)
         {
             if (micros() - observationStart >= OBSERVE_TIME_US)
             {
@@ -148,7 +140,7 @@ void Observer::observePwm()
 
         waitStart = micros();
 
-        while (digitalRead(PinConfig::TARGET_OBSERVER_PIN) == LOW)
+        while (digitalRead(PinConfig::TARGET_PA2) == LOW)
         {
             if (micros() - observationStart >= OBSERVE_TIME_US)
             {
@@ -327,3 +319,4 @@ void Observer::observePwm()
     Serial.print(frequencyMax % 100);
     Serial.println(F(" Hz"));
 }
+

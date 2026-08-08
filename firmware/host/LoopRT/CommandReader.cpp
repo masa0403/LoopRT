@@ -24,7 +24,36 @@ Command* CommandReader::read()
                 return new Command(CommandType::PinHigh);
 
             case 'D':
-                return new Command(CommandType::Delay);
+            {
+                while (Serial.available() == 0)
+                {
+                }
+
+                char open = Serial.read();
+
+                if (open != '(')
+                {
+                    return new Command(CommandType::None);
+                }
+
+                int value = Serial.parseInt();
+
+                while (Serial.available() == 0)
+                {
+                }
+
+                char close = Serial.read();
+
+                if (close != ')')
+                {
+                    return new Command(CommandType::None);
+                }
+
+                return new Command(
+                    CommandType::Delay,
+                    value
+                );
+            }
 
             case 'L':
                 return new Command(CommandType::PinLow);
