@@ -1,4 +1,5 @@
 import serial
+import time
 
 def send_commands(port, commands, baudrate=115200):
     ser = serial.Serial(port, baudrate, timeout=1)
@@ -22,7 +23,11 @@ def send_commands(port, commands, baudrate=115200):
     print("[INFO] Send Command Sequence")
     print(repr(sequence))
 
-    ser.write(sequence.encode())
+    #ser.write(sequence.encode()) #一括送信→長文でバッファ満杯になってデバッグがフリーズした
+    for command in commands:
+        ser.write(command.encode())
+        print(f"[INFO] Send Command: {repr(command)}")
+        time.sleep(2)
 
     print("[INFO] Waiting for LoopRT result...")
 

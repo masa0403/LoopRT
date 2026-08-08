@@ -6,8 +6,10 @@
  */
 namespace PinConfig
 {
-    constexpr int EXECUTOR_PIN = 8;
-    constexpr int OBSERVER_PIN = 7;
+    // Host Nano
+    constexpr int TARGET_CONTROL_PIN = 8;
+    constexpr int TARGET_OBSERVER_PIN = 7;
+    constexpr int PWM_OUTPUT_PIN = 9;
 }
 
 #endif

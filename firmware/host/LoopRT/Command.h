@@ -9,6 +9,8 @@ enum class CommandType
     None,
     PinHigh,
     PinLow,
+    Pwm,
+    PwmInput,
     Delay,
     End
 };
@@ -22,14 +24,17 @@ public:
 
     Command();
     Command(CommandType type);
+    Command(CommandType type, int value);
 
     void execute();
 
     bool isEnd();
+    bool isPwmInput();
 
 private:
 
     CommandType type;
+    int value;
 };
 
 #endif

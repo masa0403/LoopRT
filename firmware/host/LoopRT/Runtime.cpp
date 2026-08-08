@@ -20,8 +20,9 @@ void Runtime::initialize()
 
 void Runtime::run()
 {
-    pinMode(PinConfig::OBSERVER_PIN, INPUT);
-    pinMode(PinConfig::EXECUTOR_PIN, OUTPUT);
+    pinMode(PinConfig::TARGET_OBSERVER_PIN, INPUT);
+    pinMode(PinConfig::TARGET_CONTROL_PIN, OUTPUT);
+    pinMode(PinConfig::PWM_OUTPUT_PIN, OUTPUT);
 
     executor.execute(experiment, observer);
 }

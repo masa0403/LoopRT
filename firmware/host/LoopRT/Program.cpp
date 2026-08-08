@@ -14,9 +14,10 @@ void Program::execute(Observer& observer)
 
         command->execute();
 
-        // Command実行直後のTarget MCU状態を観測
-        //observer.readPin();
-        observer.observePwm();
+        if (command->isPwmInput())
+        {
+            observer.observePwm();
+        }
 
         bool end = command->isEnd();
 
