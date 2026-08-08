@@ -3,6 +3,9 @@ import os
 import subprocess
 
 
+# ------------------------------------------------------------
+# ターゲットMCUを書き込みのためのArduino CLIをインストール
+# ------------------------------------------------------------
 def setup_arduino_cli():
     base_dir = Path(__file__).resolve().parent.parent / "bin"
     base_dir.mkdir(parents=True, exist_ok=True)
@@ -29,3 +32,15 @@ def setup_arduino_cli():
     print("[INFO] Arduino CLI installed.")
 
     return str(arduino_cli)
+
+# ------------------------------------------------------------
+# インストールしたArduino CLIのパスを探す
+# ------------------------------------------------------------
+def find_file(base: Path, name: str) -> str:
+    for path in base.rglob("bin/" + name):
+        if path.is_file():
+            return str(path)
+    for path in base.rglob("*"):
+        if path.is_file() and path.name == name:
+            return str(path)
+    raise FileNotFoundError(f"{name} not found under {base}")

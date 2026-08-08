@@ -4,12 +4,14 @@
 #include "PinConfig.h"
 
 Command::Command()
-    : type(CommandType::None)
+    : type(CommandType::None),
+      value(0)
 {
 }
 
 Command::Command(CommandType type)
-    : type(type)
+    : type(type),
+      value(0)
 {
 }
 
@@ -31,28 +33,40 @@ void Command::execute()
             break;
 
         case CommandType::Delay:
-            delay(1000);
-            Serial.println(F("[INFO] Execute Delay"));
+            Serial.print(F("[INFO] Execute Delay: "));
+            Serial.print(value);
+            Serial.println(F(" ms"));
+
+            delay(value);
             break;
 
         case CommandType::PinHigh:
-            digitalWrite(PinConfig::TARGET_CONTROL_PIN, HIGH);
-            Serial.println(F("[INFO] Execute Pin High"));
+            pinMode(PinConfig::TARGET_PA3, OUTPUT);
+            digitalWrite(PinConfig::TARGET_PA3, HIGH);
+
+            Serial.println(F("[HOST] GPIO PA3 (D8) HIGH"));
             break;
 
         case CommandType::PinLow:
-            digitalWrite(PinConfig::TARGET_CONTROL_PIN, LOW);
-            Serial.println(F("[INFO] Execute Pin Low"));
+            pinMode(PinConfig::TARGET_PA3, OUTPUT);
+            digitalWrite(PinConfig::TARGET_PA3, LOW);
+
+            Serial.println(F("[HOST] GPIO PA3 (D8) LOW"));
             break;
 
         case CommandType::Pwm:
+        {
             int pwmValue = map(value, 0, 100, 0, 255);
-            pinMode(PinConfig::PWM_OUTPUT_PIN, OUTPUT);
-            analogWrite(PinConfig::PWM_OUTPUT_PIN, pwmValue);
-            Serial.print(F("[HOST] PWM D9 "));
+
+            pinMode(PinConfig::TARGET_PA6, OUTPUT);
+            analogWrite(PinConfig::TARGET_PA6, pwmValue);
+
+            Serial.print(F("[HOST] PWM PA6 (D9) "));
             Serial.print(value);
             Serial.println(F("%"));
+
             break;
+        }
 
         case CommandType::PwmInput:
             Serial.println(F("[INFO] Execute PWM Input Observe"));
@@ -79,3 +93,4 @@ bool Command::isPwmInput()
 {
     return type == CommandType::PwmInput;
 }
+

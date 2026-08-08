@@ -1,47 +1,58 @@
 import serial
 import time
 
+
 def send_commands(port, commands, baudrate=115200):
     ser = serial.Serial(port, baudrate, timeout=1)
 
+    try:
+        print("[INFO] Waiting for LoopRT Ready...")
 
-    print("[INFO] Waiting for LoopRT Ready...")
+        while True:
+            line = ser.readline().decode(errors="replace").strip()
 
-    while True:
-        line = ser.readline().decode(errors="replace").strip()
+            if not line:
+                continue
 
-        if not line:
-            continue
+            print(f"[LOOPRT] {line}")
 
-        print(f"[LOOPRT] {line}")
+            if line == "LoopRT Ready":
+                break
 
-        if line == "LoopRT Ready":
-            break
+        print("[INFO] Send Command Sequence")
 
-    sequence = "\n".join(commands) + "\n"
+        for command in commands:
+            start_time = time.perf_counter()
 
-    print("[INFO] Send Command Sequence")
-    print(repr(sequence))
+            ser.write(command.encode())
+            print(f"[INFO] Send Command: {repr(command)}")
 
-    #ser.write(sequence.encode()) #一括送信→長文でバッファ満杯になってデバッグがフリーズした
-    for command in commands:
-        ser.write(command.encode())
-        print(f"[INFO] Send Command: {repr(command)}")
-        time.sleep(2)
+            # LoopRTからCommand完了通知を待つ
+            while True:
+                line = ser.readline().decode(errors="replace").strip()
 
-    print("[INFO] Waiting for LoopRT result...")
+                if not line:
+                    continue
 
-    while True:
-        line = ser.readline().decode(errors="replace").strip()
+                print(f"[LOOPRT] {line}")
 
-        if not line:
-            continue
+                if line == "[DONE]":
+                    elapsed_time = time.perf_counter() - start_time
+                    print(f"[INFO] Command Duration: {elapsed_time:.3f} s")
+                    break
 
-        print(f"[LOOPRT] {line}")
+        print("[INFO] Waiting for Experiment End...")
 
-        if line.startswith("[RESULT]"):
-            ser.close()
-            return line
+        while True:
+            line = ser.readline().decode(errors="replace").strip()
 
-    ser.close()
+            if not line:
+                continue
 
+            print(f"[LOOPRT] {line}")
+
+            if line == "Experiment End":
+                return line
+
+    finally:
+        ser.close()
