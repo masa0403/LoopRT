@@ -1,0 +1,540 @@
+# LoopRT 実験プロジェクト開発ルール
+
+あなたは組み込み開発AIです。
+
+これから、**LoopRTを使用してATtiny202向けの小さな組み込みプロジェクトを設計・実装し、実機で検証してください。**
+
+---
+
+## 1. 開発環境
+
+以下の構成で実験します。
+
+* Target MCU：ATtiny202
+* Host MCU：Arduino Nano
+* Host MCUではLoopRTが動作している
+* PCからPythonを使用してLoopRTへコマンドを送信する
+* Target MCUには、あなたが作成したCコードをFlashする
+* Target MCUとHost MCUは抵抗を介して接続されている
+* LoopRT本体はすでに動作確認済み
+
+### 重要
+
+今回、**LoopRT本体のコードは変更しないでください。**
+
+あなたが作成・変更するものは基本的に以下の2つです。
+
+* Target MCU用Cコード
+* LoopRTへ送信する検証用commands
+
+---
+
+# 2. PinConfig（物理配線）
+
+現在の物理配線は固定されています。
+
+| Target MCU    | Host MCU        | 用途            |
+| ------------- | --------------- | ------------- |
+| ATtiny202 PA2 | Arduino Nano D7 | PWM観測         |
+| ATtiny202 PA3 | Arduino Nano D8 | GPIO / 信号入力   |
+| ATtiny202 PA6 | Arduino Nano D9 | RC回路を介したADC入力 |
+
+つまり、
+
+```text
+Target PA2 ↔ Host D7
+Target PA3 ↔ Host D8
+Target PA6 ↔ Host D9
+```
+
+です。
+
+### 絶対に注意すること
+
+Target MCUのコードでは、
+
+* PA2
+* PA3
+* PA6
+
+という**ATtiny202側のピン番号**を使用します。
+
+一方、LoopRTのcommandsでは、
+
+* D7
+* D8
+* D9
+
+という**Arduino Nano側のピン番号**を指定します。
+
+Target MCUとHost MCUのピン番号を混同しないでください。
+
+---
+
+# 3. PA6-D9間のRC回路
+
+今回のADC実験では、**必ずPA6-D9間のRC回路を使用してください。**
+
+信号経路は以下です。
+
+```text
+Arduino Nano D9
+      │
+      │ PWM
+      ▼
+    RC回路
+      │
+      ▼
+ATtiny202 PA6
+      │
+      │ ADC
+      ▼
+   ADCで電圧測定
+```
+
+つまり、
+
+* Host D9からPWMを出力する
+* RC回路によってPWMを平滑化する
+* Target PA6でその電圧をADC入力として読む
+* ADC値に応じてTarget MCUのPWM Dutyを変化させる
+
+という実験にしてください。
+
+**PA6をADC入力として使用してください。**
+
+PA6をTarget MCU側のPWM出力として使用する設計にはしないでください。
+
+---
+
+# 4. LoopRTで使用できるcommands
+
+現在使用できるLoopRT commandsは以下です。
+
+```text
+H(pin)       GPIO HIGH
+L(pin)       GPIO LOW
+
+P(pin,value) PWM output
+PI(pin)      PWM input observe
+
+D(value)     Delay
+
+E            End
+```
+
+---
+
+## 4.1 GPIO HIGH
+
+```text
+H(8)
+```
+
+Arduino NanoのD8をHIGHにします。
+
+これはTarget MCUのPA3へ信号を入力するために使用できます。
+
+---
+
+## 4.2 GPIO LOW
+
+```text
+L(8)
+```
+
+Arduino NanoのD8をLOWにします。
+
+---
+
+## 4.3 PWM Output
+
+```text
+P(9,50)
+```
+
+Arduino NanoのD9から50% PWMを出力します。
+
+**これはTarget MCUのPWM出力ではありません。**
+
+LoopRTを実行しているHost MCU、つまりArduino NanoのD9からPWMを出力します。
+
+今回の実験では、
+
+```text
+Host D9
+ ↓
+RC回路
+ ↓
+Target PA6
+ ↓
+ADC
+```
+
+という入力信号を作るために使用してください。
+
+---
+
+## 4.4 PWM Input Observe
+
+```text
+PI(7)
+```
+
+Arduino NanoのD7に入力されたPWM信号を観測します。
+
+Target MCUのPA2から出力されたPWMをD7で観測するために使用します。
+
+LoopRTはPWMを観測して、例えば以下のような情報を取得できます。
+
+```text
+[TARGET] Duty Avg: 49.xx %
+[TARGET] Period Avg: xxxx us
+[TARGET] Frequency Avg: xxx.xx Hz
+```
+
+---
+
+## 4.5 Delay
+
+```text
+D(500)
+```
+
+500ms待機します。
+
+Target MCUのADC値が安定する時間や、PWM出力が安定する時間を確保するために使用してください。
+
+---
+
+## 4.6 End
+
+```text
+E
+```
+
+実験を終了します。
+
+---
+
+# 5. commandsの重要な考え方
+
+commandsは、Target MCUのCコードを直接操作するものではありません。
+
+commandsは、
+
+* Host MCUからTarget MCUへ入力信号を与える
+* Target MCUからHost MCUへ出力された信号を観測する
+
+ための**実験手順**です。
+
+例えば今回、
+
+```text
+Host D9
+ ↓
+RC回路
+ ↓
+Target PA6
+ ↓
+ADC
+```
+
+という入力経路を使用します。
+
+そのため、
+
+```text
+P(9,25)
+```
+
+は、
+
+**Host D9から25% PWMをTarget PA6へ入力する**
+
+という意味になります。
+
+一方、
+
+```text
+PI(7)
+```
+
+は、
+
+**Target PA2から出力されたPWMをHost D7で観測する**
+
+という意味になります。
+
+---
+
+# 6. 今回作るプロジェクト
+
+今回のプロジェクトは、
+
+**「ADC入力電圧に応じてPWM出力を変化させるプログラム」**
+
+としてください。
+
+できるだけシンプルにしてください。
+
+基本的な処理は以下です。
+
+```text
+Host D9
+  │
+  │ PWM
+  ▼
+ RC回路
+  │
+  ▼
+Target PA6
+  │
+  │ ADC
+  ▼
+ADC値
+  │
+  │ 処理
+  ▼
+PWM Duty
+  │
+  ▼
+Target PA2
+  │
+  ▼
+Host D7
+  │
+  ▼
+LoopRTでPWM観測
+```
+
+---
+
+# 7. Target MCU側で実装する機能
+
+ATtiny202側では最低限、以下を実装してください。
+
+### ADC
+
+* PA6をADC入力として使用する
+* ADCでPA6の電圧を読み取る
+* 可能な範囲で0〜100%相当の入力値を扱えるようにする
+
+### データ処理
+
+ADC値をPWM Dutyへ変換してください。
+
+例えば、
+
+```text
+ADC 0      → PWM 0%
+ADC 中間値 → PWM 約50%
+ADC 最大値 → PWM 約100%
+```
+
+となるようにしてください。
+
+### PWM
+
+* Target MCUのPA2からPWMを出力する
+* ADC値に応じてPWM Dutyを変更する
+
+---
+
+# 8. 検証方法
+
+LoopRTを使って、Host D9から異なるDutyのPWMを入力してください。
+
+例えば、
+
+```text
+25%
+50%
+75%
+```
+
+などです。
+
+それぞれについて、
+
+1. Host D9からPWMを出力
+2. RC回路を通してTarget PA6へ入力
+3. Target MCUがADC値を読む
+4. Target MCUがPA2のPWM Dutyを変更
+5. Host D7でPA2のPWMを観測
+
+という流れで検証してください。
+
+---
+
+# 9. 検証commands
+
+PythonからそのままLoopRTへ送信できる形式で作成してください。
+
+形式は以下です。
+
+```python
+commands = [
+    "...",
+    "...",
+    "E\n"
+]
+```
+
+commandsでは、各入力条件の間に必要なDelayを入れてください。
+
+また、各入力条件について、
+
+```text
+Host D9からPWM入力
+↓
+待機
+↓
+Host D7でTarget PA2のPWMを観測
+```
+
+という流れになるようにしてください。
+
+---
+
+# 10. 期待する結果
+
+LoopRTのログから、Target MCUのPWM出力が入力電圧に応じて変化していることを確認してください。
+
+例えば、
+
+```text
+Host D9 = 25%
+→ Target PA6のADC電圧 ≈ 25%相当
+→ Target PA2 PWM ≈ 25%
+```
+
+```text
+Host D9 = 50%
+→ Target PA6のADC電圧 ≈ 50%相当
+→ Target PA2 PWM ≈ 50%
+```
+
+```text
+Host D9 = 75%
+→ Target PA6のADC電圧 ≈ 75%相当
+→ Target PA2 PWM ≈ 75%
+```
+
+のような関係が確認できれば成功です。
+
+ただし、RC回路、ADC、PWM、電源電圧などの影響により完全に一致しない可能性があります。
+
+そのため、**ある程度の誤差を考慮して判断してください。**
+
+---
+
+# 11. 成功条件
+
+単にCコードがコンパイルできただけでは成功とはしません。
+
+以下をすべて確認してください。
+
+* Target MCUへCコードをFlashできる
+* Host D9から入力PWMを与えられる
+* RC回路を通してPA6へ電圧が入力される
+* ATtiny202がPA6の電圧をADCで読み取る
+* ADC値に応じてPA2のPWM Dutyが変化する
+* Host D7からPA2のPWMを観測できる
+* LoopRTのPWM観測結果から、入力と出力の関係を確認できる
+
+---
+
+# 12. 重要な制約
+
+以下の制約を必ず守ってください。
+
+* LoopRT本体のコードを変更しない
+* PinConfigの物理配線を変更しない
+* Target MCUのピン番号とHost MCUのピン番号を混同しない
+* commandsではHost MCU側のD番号を使用する
+* Target MCUコードではATtiny202のPA番号を使用する
+* ADC入力にはTarget PA6を使用する
+* PA6-D9間の既存RC回路を使用する(R=10kΩ, C=0.1uF)→10 kΩ	1 μF (または 10 μF)	約 16 Hz (10μFなら 1.6Hz)	★おすすめ。リップルが消え、完全な直流になる
+* Target PWM出力にはPA2を使用する
+* PA2のPWMはHost D7からPI(7)で観測する
+* 実機で検証可能な設計にする
+* 検証commandsも自分で設計する
+* 最初から複雑な機能を追加しない
+* 最小構成で確実に動作するものを優先する
+* 目視デバッグ用 LED のチラツキ（フリッカー）を完全に抑えるため、PWM 周波数は 3kHz〜5kHz 程度の高周波 に設定すること。
+* RC 回路や分圧による電圧オフセット・減衰を補正し、入力 Duty 比と出力 Duty 比がほぼ 1:1（等しい値）になるようキャリブレーション処理 を入れること。
+* TargetMCUの出力を確認する場合、何も入力していない初期状態の出力も確認する。
+
+---
+
+# 13. あなたの回答に求めるもの
+
+まず、以下の順番で回答してください。
+
+### ① 設計概要
+
+* プログラムの目的
+* Target MCUで使用するピン
+* 各ピンの役割
+* 入力から出力までの処理の流れ
+
+### ② Target MCUコード
+
+ATtiny202でコンパイル可能な**完全なCコード**を提示してください。
+
+### ③ 配線
+
+既存のPinConfigを前提として、
+
+* PA6
+* PA2
+* D9
+* D7
+* RC回路
+
+の関係を説明してください。
+
+### ④ LoopRT検証commands
+
+Pythonからそのまま使用できるcommandsを提示してください。
+
+### ⑤ 期待する結果
+
+各commandsを実行したときに、
+
+* どのようなPWM Dutyになることを期待するか
+* LoopRTのどのログを見るべきか
+* どの程度の誤差なら正常と判断するか
+
+を説明してください。
+
+---
+
+## 最重要事項
+
+今回の目的は、
+
+**「AIが組み込みプロジェクトを設計し、Target MCUコードと実機検証手順を自分で作り、LoopRTを使って実機で正しく動作することを確認できるか」**
+
+を検証することです。
+
+したがって、
+
+**コードを作って終わりにしないでください。**
+
+必ず、
+
+```text
+設計
+↓
+Target MCUコード作成
+↓
+検証commands作成
+↓
+実機検証
+↓
+LoopRTログによる評価
+```
+
+まで成立するように設計してください。
