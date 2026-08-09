@@ -151,6 +151,11 @@ bool Command::isPwmInput()
     return type == CommandType::PwmInput;
 }
 
+bool Command::isInput()
+{
+    return type == CommandType::Input;
+}
+
 int Command::getPin() const
 {
     return pin;

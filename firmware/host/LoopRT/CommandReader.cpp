@@ -222,6 +222,47 @@ Command* CommandReader::read()
                 );
             }
 
+            // -------------------------------------------------
+            // GPIO Input
+            // I(7)
+            // -------------------------------------------------
+
+            case 'I':
+            {
+                while (Serial.available() == 0)
+                {
+                }
+
+                char open = Serial.read();
+
+                if (open != '(')
+                {
+                    return new Command(
+                        CommandType::None
+                    );
+                }
+
+                int pin = Serial.parseInt();
+
+                while (Serial.available() == 0)
+                {
+                }
+
+                char close = Serial.read();
+
+                if (close != ')')
+                {
+                    return new Command(
+                        CommandType::None
+                    );
+                }
+
+                return new Command(
+                    CommandType::Input,
+                    pin,
+                    0
+                );
+            }
 
             // -------------------------------------------------
             // Delay
