@@ -8,6 +8,7 @@ enum class CommandType
     PinLow,
     Pwm,
     PwmInput,
+    Input,
     Delay,
     End
 };
@@ -31,6 +32,8 @@ public:
     bool isEnd();
 
     bool isPwmInput();
+
+    bool isInput();
 
     int getPin() const;
 

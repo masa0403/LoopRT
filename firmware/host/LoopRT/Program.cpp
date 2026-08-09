@@ -19,6 +19,11 @@ void Program::execute(Observer& observer)
             observer.observePwm(command->getPin());
         }
 
+        if (command->isInput())
+        {
+            observer.readPin(command->getPin());
+        }
+
         Serial.println(F("[DONE]"));
 
         bool end = command->isEnd();
