@@ -229,11 +229,15 @@ Command* CommandReader::read()
 
             case 'I':
             {
+                Serial.println(F("[DEBUG] Received I"));
+
                 while (Serial.available() == 0)
                 {
                 }
 
                 char open = Serial.read();
+
+                Serial.println(F("[DEBUG] Read I argument"));
 
                 if (open != '(')
                 {
@@ -243,6 +247,9 @@ Command* CommandReader::read()
                 }
 
                 int pin = Serial.parseInt();
+
+                Serial.print(F("[DEBUG] I pin = "));
+                Serial.println(pin);
 
                 while (Serial.available() == 0)
                 {

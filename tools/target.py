@@ -73,7 +73,7 @@ LOOPRT_SKETCH = (
 # Target Flash
 # =========================================================
 
-def flash_target():
+def flash_target(source_path):
 
     print("[INFO] Target Flash")
 
@@ -123,7 +123,7 @@ def flash_target():
     # ---------------------------------------------------------
 
     print("[INFO] Target: attiny202")
-    print(f"[INFO] Source: {TARGET_SOURCE}")
+    print(f"[INFO] Source: {source_path}")
     print(f"[INFO] F_CPU: {f_cpu}")
 
     TARGET_OUTPUT.mkdir(
@@ -132,7 +132,7 @@ def flash_target():
     )
 
     elf_path, hex_path = compile_avr(
-        TARGET_SOURCE,
+        source_path,
         "attiny202",
         TARGET_OUTPUT,
         f_cpu,

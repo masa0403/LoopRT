@@ -1,0 +1,84 @@
+import requests
+
+
+OLLAMA_URL = "http://127.0.0.1:11434/api/chat"
+MODEL = "qwen3.5:9b"
+
+
+SYSTEM_PROMPT = """
+あなたは組み込みマイコン開発を支援するAIです。
+
+対象マイコン:
+- ATtiny202
+- 開発環境: AVR-GCC / megaTinyCore
+- PA0: UPDI
+- PA2: GPIO
+- PA3: GPIO
+- PA6: GPIO
+
+LoopRTは、マイコンへ実験コマンドを送信し、
+実際のピン状態やPWMなどを観測するための実験ランタイムです。
+
+LoopRTの実験コマンド:
+- H(pin)       : GPIO HIGH
+- L(pin)       : GPIO LOW
+- D(ms)        : 指定時間待機
+- I(pin)       : GPIO状態を観測
+- P(pin,duty)  : PWM出力
+- PI(pin)      : PWM入力を観測
+- E            : 実験終了
+
+重要:
+- ATtiny202のポート名を正確に扱うこと。
+- PA6はPORTAのbit 6である。
+- 存在しないLoopRTコマンドを勝手に作らないこと。
+- 不明な仕様を推測せず、与えられた仕様を優先すること。
+
+まずはコードと実験コマンドを提案してください。
+"""
+
+
+def ask_llm(user_prompt):
+    payload = {
+        "model": MODEL,
+        "messages": [
+            {
+                "role": "system",
+                "content": SYSTEM_PROMPT,
+            },
+            {
+                "role": "user",
+                "content": user_prompt,
+            },
+        ],
+        "stream": False,
+    }
+
+    print("[INFO] Sending prompt to Ollama...")
+
+    response = requests.post(
+        OLLAMA_URL,
+        json=payload,
+        timeout=300,
+    )
+
+    response.raise_for_status()
+
+    data = response.json()
+
+    return data["message"]["content"]
+
+
+if __name__ == "__main__":
+    prompt = """
+ATtiny202のPA6をHIGHにする最小限のCコードを書いてください。
+
+そのコードをLoopRTで確認するための実験コマンドも提示してください。
+"""
+
+    result = ask_llm(prompt)
+
+    print()
+    print("========== LLM RESPONSE ==========")
+    print(result)
+    print("==================================")
