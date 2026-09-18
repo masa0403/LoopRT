@@ -1,7 +1,11 @@
 def parse_llm_response(response):
-    code_start = response.find("===CODE===")
-    commands_start = response.find("===COMMANDS===")
-    end = response.find("===END===")
+
+    code_marker = "===CODE==="
+    commands_marker = "===COMMANDS==="
+    end_marker = "===END==="
+
+    code_start = response.find(code_marker)
+    commands_start = response.find(commands_marker)
 
     if code_start == -1:
         raise ValueError("===CODE=== not found")
@@ -9,18 +13,46 @@ def parse_llm_response(response):
     if commands_start == -1:
         raise ValueError("===COMMANDS=== not found")
 
-    if end == -1:
-        raise ValueError("===END=== not found")
+    if commands_start <= code_start:
+        raise ValueError(
+            "===COMMANDS=== appears before ===CODE==="
+        )
+
+    end = response.find(
+        end_marker,
+        commands_start + len(commands_marker),
+    )
+
+    # -------------------------------------------------
+    # Code
+    # -------------------------------------------------
 
     code = response[
-        code_start + len("===CODE==="):
+        code_start + len(code_marker):
         commands_start
     ].strip()
 
-    commands_text = response[
-        commands_start + len("===COMMANDS==="):
-        end
-    ].strip()
+    # -------------------------------------------------
+    # Commands
+    # -------------------------------------------------
+
+    if end == -1:
+
+        print(
+            "[WARN] ===END=== not found. "
+            "Using end of response."
+        )
+
+        commands_text = response[
+            commands_start + len(commands_marker):
+        ].strip()
+
+    else:
+
+        commands_text = response[
+            commands_start + len(commands_marker):
+            end
+        ].strip()
 
     commands = [
         line.strip()
@@ -28,24 +60,37 @@ def parse_llm_response(response):
         if line.strip()
     ]
 
+    # -------------------------------------------------
+    # Basic Validation
+    # -------------------------------------------------
+
+    if not code:
+        raise ValueError("Generated C code is empty")
+
+    if not commands:
+        raise ValueError("Generated commands are empty")
+
     return code, commands
 
 
 if __name__ == "__main__":
+
     test_response = """
 ===CODE===
 #include <avr/io.h>
 
-int main(void) {
-    PORTA |= (1 << 6);
-    while(1);
+int main(void)
+{
+    PORTA.DIR |= (1 << 6);
+    PORTA.OUT |= (1 << 6);
+
+    while (1)
+    {
+    }
 }
 ===COMMANDS===
-H(8)
-D(500)
-I(8)
+I(9)
 E
-===END===
 """
 
     code, commands = parse_llm_response(test_response)
@@ -55,5 +100,6 @@ E
 
     print()
     print("========== COMMANDS ==========")
+
     for command in commands:
         print(repr(command))

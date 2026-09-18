@@ -2,7 +2,6 @@ import requests
 from pathlib import Path
 
 from llm_parser import parse_llm_response
-from compile_flash import compile_avr
 from target import flash_target
 from looprt import send_commands
 from nano_port import detect_nano_port
@@ -302,294 +301,23 @@ int main(void)
 
 のようにmain()を含む完全なプログラムにしてください。
 
-
-============================================================
-7. LoopRT commands
-============================================================
-
-現在LoopRTで使用できるcommandsは以下だけです。
-
-H(pin)
-L(pin)
-D(ms)
-I(pin)
-P(pin,duty)
-PI(pin)
-E
-
-
-存在しないcommandを生成してはいけません。
-
-例えば以下は禁止です。
-
-delay_us()
-delay()
-write()
-read()
-wait()
-trigger()
-edge()
-observe()
-ADC()
-PWM()
-GPIO()
-
-
-LoopRTの仕様を勝手に拡張してはいけません。
-
-
-============================================================
-8. H()
-============================================================
-
-H(pin)
-
-Host Arduino Nanoの指定pinをHIGHにします。
-
-
-例:
-
-H(8)
-
-→ Arduino Nano D8 HIGH
-
-
-============================================================
-9. L()
-============================================================
-
-L(pin)
-
-Host Arduino Nanoの指定pinをLOWにします。
-
-
-例:
-
-L(8)
-
-→ Arduino Nano D8 LOW
-
-
-============================================================
-10. I()
-============================================================
-
-I(pin)
-
-Host Arduino Nanoの指定pinの現在のGPIO状態を1回観測します。
-
-
-I()には状態遷移検出機能はありません。
-
-以下を行いません。
-
-- エッジ検出
-- 前回状態との比較
-- 自動状態保持
-- 自動的な別ピン操作
-
-
-必要な場合は、commands側でI()を複数回使用してください。
-
-
-============================================================
-11. P()
-============================================================
-
-P(pin,duty)
-
-Host Arduino Nanoの指定pinからPWMを出力します。
-
-例:
-
-P(9,25)
-
-→ Host D9から25% PWM
-
-
-今回の配線では、
-
-Host D9
-↓
-RC回路
-↓
-Target PA6
-
-という経路になります。
-
-
-============================================================
-12. PI()
-============================================================
-
-PI(pin)
-
-Host Arduino Nanoの指定pinに入力されたPWMを観測します。
-
-例えば、
-
-PI(7)
-
-はHost D7を観測します。
-
-Target PA2からPWMが出力されている場合、
-
-Target PA2
-↓
-Host D7
-↓
-PI(7)
-
-という形でPWMを測定します。
-
-
-I()とPI()を混同してはいけません。
-
-I()
-= GPIOの現在値を1回観測
-
-PI()
-= PWM信号を観測
-
-
-============================================================
-13. D()
-============================================================
-
-D(ms)
-
-指定時間だけ待機します。
-
-例:
-
-D(500)
-
-= 500ms待機
-
-
-ADCやPWMなどの安定待ちに使用してください。
-
-
-============================================================
-14. E()
-============================================================
-
-E
-
-実験を終了します。
-
-
-============================================================
-15. PA6とADC
-============================================================
-
-PA6はADC入力として使用できます。
-
-現在の物理配線では、
-
-Host D9
-↓
-RC回路
-↓
-Target PA6
-↓
-ADC
-
-です。
-
-RC回路:
-
-R = 3.3kΩ
-C = 3.3uF
-
-Host D9からPWMを出力し、
-RC回路で平滑化した電圧を
-Target PA6へ入力できます。
-
-そのため、
-
-P(9,25)
-P(9,50)
-P(9,75)
-P(9,100)
-
-などをADC入力実験に使用できます。
-
-
-============================================================
-16. TargetとHostの役割
-============================================================
-
-Target MCUのCコード:
-
-- Target MCUのGPIOを設定
-- Target MCUのPWMを生成
-- Target MCUのADCを読む
-- Target MCU内部の処理を行う
-
-
-LoopRT commands:
-
-- Host GPIOを操作
-- Host PWMを出力
-- TargetからHostへ戻ってきた信号を観測
-- 実験タイミングを制御
-
-
-commandsからTarget MCUのCコード内部の関数を直接呼び出すことはできません。
-
-
-============================================================
-17. 最小実装原則
-============================================================
-
-可能な限り最小限のコードを生成してください。
-
-不要な:
-
-- ライブラリ
-- 抽象化
-- 構造体
-- 複雑な関数
-- 不要なタイマー
-- 不要な割り込み
-- 不要なコメント
-
-を追加しないでください。
-
-ただし、動作に必要なものは省略しないでください。
-
-
-============================================================
-18. LoopRTを変更しない
-============================================================
-
-LoopRT本体の仕様変更を提案してはいけません。
-
-LoopRTに存在しない機能を必要とする場合、
-LoopRTを改造するのではなく、
-現在使用可能なcommandsだけで検証方法を考えてください。
-
-
 ============================================================
 19. 出力形式
 ============================================================
 
-必ず以下の形式だけで回答してください。
+今回はTarget MCUのCコードだけを生成してください。
 
+必ず以下の形式だけで回答してください。
 
 ===CODE===
 完全なATtiny202用Cコード
-===COMMANDS===
-LoopRT commands
 ===END===
-
 
 説明文は禁止です。
 
 Markdownのコードブロックは禁止です。
 
-===CODE=== と ===COMMANDS=== と ===END=== は
+===CODE=== と ===END=== は
 必ず正確に出力してください。
 
 
@@ -611,17 +339,6 @@ Markdownのコードブロックは禁止です。
 8. GPIO bit番号は2, 3, 6を正しく使用しているか？
 9. avr-gcc -mmcu=attiny202でコンパイル可能か？
 10. Arduino APIを使用していないか？
-
-
-[LoopRT commands]
-
-1. commandsに存在しないcommandがないか？
-2. LoopRT pin番号がHost Arduino Nano側の番号になっているか？
-3. Target PA2 → Host D7
-4. Target PA3 → Host D8
-5. Target PA6 → Host D9
-6. I()とPI()を混同していないか？
-7. 不要なLoopRT仕様変更を要求していないか？
 
 
 ============================================================
@@ -647,25 +364,15 @@ int main(void)
     {
     }
 }
-===COMMANDS===
-I(9)
-E
 ===END===
-
-
-ここでI(9)はTarget PA6を直接読むcommandではありません。
-
-Host D9を観測します。
-
-Target PA6とHost D9の間に適切な接続がある場合に、
-その電気的状態をHost側から確認するために使用します。
 
 
 ============================================================
 22. 絶対禁止事項まとめ
 ============================================================
 
-以下は絶対に生成しないこと。
+以下のシンボルをCコード中で使用してはいけません。
+ただし、説明文やユーザー要求に含まれる「PA2」「PA3」「PA6」というピン名そのものは禁止ではありません。
 
 DDRA
 DDRB
@@ -726,24 +433,148 @@ PORTA.IN
 
 不明な仕様を推測してはいけません。
 
-最小限で、実機検証可能なコードとLoopRT commandsだけを生成してください。
+最小限で実機検証可能なコードを生成してください。
 """
 
+EXPERIMENT_SYSTEM_PROMPT = """
 
-def ask_llm(user_prompt):
+
+あなたはLoopRTの実機実験コマンドを生成するAIです。
+
+目的:
+与えられたTarget Cコードが、実機上で意図した動作をしているか確認するための
+最小限のLoopRTコマンドを生成してください。
+
+Target MCU:
+- ATtiny202
+
+Host MCU:
+- Arduino Nano
+- LoopRTが動作している
+
+物理配線:
+
+Target PA2 <-> Host D7
+Target PA3 <-> Host D8
+Target PA6 <-> Host D9
+
+TargetとHostのピン対応:
+
+- Target PA2 -> Host D7
+- Target PA3 -> Host D8
+- Target PA6 -> Host D9
+
+重要:
+LoopRTで指定するpin番号は、必ずArduino Nano側の数字です。
+
+例:
+- Target PA2を観測する -> I(7)
+- Target PA3を観測する -> I(8)
+- Target PA6を観測する -> I(9)
+
+LoopRT commands:
+
+H(pin)
+Host側の指定pinをHIGHにする。
+
+L(pin)
+Host側の指定pinをLOWにする。
+
+D(ms)
+指定した時間だけ待つ。
+
+I(pin)
+Host側の指定pinのデジタル状態を観測する。
+
+P(pin,duty)
+Host側の指定pinにPWMを出力する。
+dutyは0〜100のパーセント。
+
+PI(pin)
+Host側のPWM信号を観測する。
+
+E
+実験を終了する。
+
+コマンドの文法:
+
+pinには必ず10進数の整数だけを指定してください。
+
+正しい:
+I(7)
+I(8)
+I(9)
+H(7)
+L(7)
+P(9,50)
+PI(9)
+
+間違い:
+I(D7)
+I(PA2)
+H(D7)
+H(PA2)
+
+「D7」「D8」「D9」のような表記は使用禁止です。
+必ず「7」「8」「9」と書いてください。
+
+実験コマンド生成ルール:
+
+1. Target Cコードを読んで、実機で確認すべき動作を判断してください。
+
+2. Cコードが特定のGPIOをHIGHまたはLOWに設定している場合、
+   対応するHost pinをI(pin)で観測してください。
+
+3. CコードがPWMを生成している場合、
+   対応するHost pinをPI(pin)で観測してください。
+
+4. Cコードの動作確認に不要なコマンドは追加しないでください。
+
+5. 特に必要がない限りD(ms)は使用しないでください。
+   静的なGPIO出力の確認では、通常D()は不要です。
+
+6. H()やL()は、Target Cコードの出力を確認するために必要な場合だけ使用してください。
+   TargetのGPIO出力を観測するだけなら、H()やL()は不要です。
+
+7. 実験では、確認に必要な観測コマンドを実行した後、Eで終了してください。
+
+8. 何も観測せずにEだけを出力しないでください。
+   Target Cコードから確認可能な動作がある場合は、必ず対応する観測コマンドを含めてください。
+
+9. 必要以上に長い実験シーケンスを作らないでください。
+
+例:
+"role": "user", "content": "ATtiny202のPA2をHIGHにするコードを作成してください。"
+この場合、Target PA2はHIGH出力なので、
+Host D7を観測します。
+
+正しい出力:
+===COMMANDS===
+I(7)
+E
+===END===
+
+出力形式:
+
+===COMMANDS===
+LoopRTコマンドを1行ずつ記述
+===END===
+
+説明文は禁止です。
+"""
+
+def ask_llm(system_prompt, user_prompt):
     payload = {
         "model": MODEL,
         "messages": [
-            {
-                "role": "system",
-                "content": SYSTEM_PROMPT,
-            },
-            {
-                "role": "user",
-                "content": user_prompt,
-            },
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
         ],
         "stream": False,
+        "think": False,
+        "options": {
+            "num_predict": 256,
+        },
     }
 
     print("[INFO] Sending prompt to Ollama...")
@@ -773,59 +604,141 @@ def save_generated_files(code, commands):
     print(f"[SAVE] Commands:  {COMMANDS_PATH}")
 
 
-def build_generated_code():
-    BUILD_DIR.mkdir(parents=True, exist_ok=True)
-
-    print("[BUILD] Compiling generated C code...")
-
-    compile_avr(
-        source=SOURCE_PATH,
-        board="attiny202",
-        output_dir=BUILD_DIR,
-        f_cpu="20000000UL",
-    )
-
     print("[BUILD] Compile successful.")
+
+def parse_code_response(response):
+    start_marker = "===CODE==="
+    end_marker = "===END==="
+
+    if start_marker not in response:
+        raise ValueError("===CODE=== が見つかりません。")
+
+    if end_marker not in response:
+        raise ValueError("===END=== が見つかりません。")
+
+    code = response.split(start_marker, 1)[1]
+    code = code.split(end_marker, 1)[0]
+
+    return code.strip()
+
+def parse_commands_response(response):
+    start_marker = "===COMMANDS==="
+    end_marker = "===END==="
+
+    if start_marker not in response:
+        raise ValueError("===COMMANDS=== が見つかりません。")
+
+    if end_marker not in response:
+        raise ValueError("===END=== が見つかりません。")
+
+    commands_text = response.split(start_marker, 1)[1]
+    commands_text = commands_text.split(end_marker, 1)[0]
+
+    commands = [
+        line.strip()
+        for line in commands_text.splitlines()
+        if line.strip()
+    ]
+
+    return commands
 
 
 if __name__ == "__main__":
 
-    prompt = """
-ATtiny202のPA6をHIGHにする最小限のCコードを作成してください。
+    user_request = "ATtiny202のPA2をHIGH、PA3をLOWにするコードを作成してください。"
 
-そのコードを実機で確認するためのLoopRT実験コマンドも作成してください。
-"""
+    code_prompt = f"""
+    ===USER REQUEST===
+    {user_request}
+    ===END USER REQUEST===
+    出力は以下の形式に従ってください。
 
-    response = ask_llm(prompt)
+    ===CODE===
+    完全なCコード
+    ===END===
+    """
 
-    print()
-    print("========== RAW LLM RESPONSE ==========")
-    print(response)
-    print("======================================")
 
-    code, commands = parse_llm_response(response)
+    # ============================================================
+    # 1. Cコード生成
+    # ============================================================
 
-    print()
+    code_response = ask_llm(
+        SYSTEM_PROMPT,
+        code_prompt,
+    )
+
+    print("========== GENERATED CODE RESPONSE ==========")
+    print(code_response)
+
+    code = parse_code_response(code_response)
+
     print("========== GENERATED CODE ==========")
     print(code)
 
-    print()
-    print("========== GENERATED COMMANDS ==========")
 
+    # ============================================================
+    # 2. 実験コマンド生成
+    # ============================================================
+
+    experiment_prompt = f"""
+    ユーザーの要求:
+    ===USER REQUEST===
+    {user_request}
+    ===END USER REQUEST===
+
+    この要求が実機上で実現されているか確認するための
+    LoopRT commandsを生成してください。
+
+    出力は以下の形式に従ってください。
+    ===COMMANDS===
+    LoopRT commandsを1行ずつ記述
+    ===END===
+    """
+
+    commands_response = ask_llm(
+        EXPERIMENT_SYSTEM_PROMPT,
+        experiment_prompt,
+    )
+
+    print("========== GENERATED COMMAND RESPONSE ==========")
+    print(commands_response)
+
+    commands = parse_commands_response(commands_response)
+
+    print("========== GENERATED COMMANDS ==========")
     for command in commands:
         print(command)
 
-    print()
+
+    # ============================================================
+    # 3. 保存
+    # ============================================================
+
     save_generated_files(code, commands)
 
-    print()
-    #build_generated_code()
 
-    print()
+    # ============================================================
+    # 4. TargetへFlash
+    # ============================================================
+
     print("[FLASH] Flashing generated code...")
     flash_target(SOURCE_PATH)
 
-    print()
+
+    # ============================================================
+    # 5. LoopRT実験
+    # ============================================================
+
+    print("========== GENERATED COMMAND RESPONSE ==========")
+    print(commands_response)
+
+    commands = parse_commands_response(commands_response)
+
+    print("========== GENERATED COMMANDS ==========")
+    for command in commands:
+        print(command)
+
     print("[RUN] Running LoopRT experiment...")
 
     port = detect_nano_port()
@@ -840,6 +753,5 @@ ATtiny202のPA6をHIGHにする最小限のCコードを作成してください
         commands_with_newline,
     )
 
-    print()
     print("[RESULT]")
     print(result)
