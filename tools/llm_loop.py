@@ -1,5 +1,6 @@
-import requests
 from pathlib import Path
+
+from openai import OpenAI
 
 from llm_parser import parse_llm_response
 from target import flash_target
@@ -7,593 +8,667 @@ from looprt import send_commands
 from nano_port import detect_nano_port
 
 
-OLLAMA_URL = "http://127.0.0.1:11434/api/chat"
-MODEL = "qwen3.5:9b"
+MODEL = "gpt-5.6-luna"
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 GENERATED_DIR = PROJECT_ROOT / "generated"
 
 SOURCE_PATH = GENERATED_DIR / "generated.c"
 COMMANDS_PATH = GENERATED_DIR / "commands.txt"
-BUILD_DIR = GENERATED_DIR / "build"
 
 
-SYSTEM_PROMPT = """
-あなたは組み込みマイコン開発を支援するAIです。
+client = OpenAI()
 
-============================================================
-1. 開発対象
-============================================================
+
+SYSTEM_PROMPT = r"""
+あなたは組み込み開発AIです。
+
+あなたの仕事は、Target MCU上で動作するプログラムを作成し、
+LoopRTを使用して実機上でデバッグし、
+ユーザー要求を満たすまでコードを修正することです。
+
+LoopRTは、Target MCUとHost MCUを接続し、
+Target MCUの動作を実機で確認するためのデバッグ環境です。
+
+あなたは単にCコードを生成するAIではありません。
+
+「コードを書く」
+→「LoopRTで実機をデバッグする」
+→「デバッグログから問題を判断する」
+→「必要ならコードまたはデバッグ手順を修正する」
+
+という一連の作業を行ってください。
+
+==============================
+
+1. AIの役割
+==============================
+
+USER_REQUESTに書かれた要求を理解し、
+ATtiny202用のCコードを作成してください。
+
+ただし、コードを作るだけで作業を終了してはいけません。
+
+作成したコードをTarget MCUに実装したものとして、
+LoopRTコマンドを使用して実機上でデバッグしてください。
+
+デバッグでは、
+
+・入力が正しく与えられているか
+・Target MCUが入力を正しく認識しているか
+・内部処理が要求どおり進んでいるか
+・出力が正しく生成されているか
+・時間的な動作が要求どおりか
+
+を確認してください。
+
+デバッグログを確認した結果、
+USER_REQUESTを満たしていない場合は、
+原因を判断してコードを修正してください。
+
+必要であればLoopRTコマンドによるデバッグ手順も修正してください。
+
+==============================
+2. 開発環境
+==============================
 
 Target MCU:
-- ATtiny202
+ATtiny202
 
 Host MCU:
-- Arduino Nano
-- LoopRTが動作している
+Arduino Nano
+
+Host MCU:
+LoopRTを実行する
 
 PC:
-- PythonからLoopRTへcommandsを送信する
+PythonからLoopRTへコマンドを送信する
 
-Target MCUのCコードはPC側でavr-gccを使用してコンパイルされ、
-ATtiny202へFlashされます。
+Target MCU:
+生成したCコードをFlashして実機で動作させる
 
-使用するコンパイラは、
+LoopRT本体:
+すでに動作確認済み
 
-avr-gcc
--mmcu=attiny202
+今回、LoopRT本体のコードは変更しないでください。
 
-です。
+==============================
+3. Target MCUのコードについて
+==============================
 
+USER_REQUESTに応じて、
+Target MCUで動作する完全なCコードを作成してください。
 
-============================================================
-2. ATtiny202の物理ピン
-============================================================
+Target MCUのコードでは、
+ATtiny202のPA番号を使用してください。
 
-Target MCUの使用ピン:
+LoopRT基板の配線や、
+ATtiny202の各ピンの機能を考慮してください。
 
-- PA0: UPDI
-- PA2: GPIO
-- PA3: GPIO
-- PA6: GPIO / ADC
+特に、Target MCUのピンを使用するときは、
+LoopRT基板上の固定配線と矛盾しないようにしてください。
 
-物理配線:
+コードを設計するときは、
 
-Target PA2 <-> Arduino Nano D7
-Target PA3 <-> Arduino Nano D8
-Target PA6 <-> Arduino Nano D9
+・GPIO
+・PWM
+・ADC
+・タイマー
+・割り込み
+・USART等の通信機能
 
-絶対にTarget MCUとHost MCUのピン番号を混同しないこと。
+など、ATtiny202のハードウェア機能と
+LoopRT基板の配線を考慮してください。
 
+ただし、USER_REQUESTに不要な機能を追加しないでください。
 
-============================================================
-3. LoopRTのピン番号
-============================================================
+必要最小限のコードで実装してください。
 
-LoopRT commandsで指定するpin番号は、
-必ずArduino Nano側のピン番号です。
+==============================
+4. LoopRT基板の配線
+==============================
 
-例えば、
+現在の物理配線は以下です。
 
-H(8)
+Target PA1 -> Host D11
+Target PA2 -> Host D7
+Target PA3 -> Host D8
+Target PA6 -> Host D9
+Target PA7 -> Host D10
 
-はArduino Nano D8をHIGHにします。
+つまり、
 
-これはTarget MCUのPA3へ接続されています。
-
-したがって、
-
-Target PA3をHIGHにしたい
-→ H(8)
-
-です。
-
-Target MCUのPA3をLoopRT commandで
-
-H(3)
-
-と指定してはいけません。
-
-
-対応関係:
-
+Target PA1 <-> Host D11
 Target PA2 <-> Host D7
 Target PA3 <-> Host D8
 Target PA6 <-> Host D9
+Target PA7 <-> Host D10
 
+です。
 
-============================================================
-4. ATtiny202のCコードに関する絶対ルール
-============================================================
+==============================
+5. TargetとHostのピン番号
+==============================
 
-重要。
+重要:
 
-Target MCUはATtiny202です。
+Target MCUのCコードでは、
+ATtiny202側のPA番号を使用してください。
 
-ATtiny202では旧AVRの以下のレジスタ表記を使用してはいけません。
-
-禁止:
-
-DDRA
-PORTA |= ...
-PORTA &= ...
-PA0
-PA1
-PA2
-PA3
-PA6
-PA7
-
-特に、
-
-DDRA
-PORTA
-PA6
-
-などの旧AVR形式を生成してはいけません。
-
-
-ATtiny202では、現在使用しているavr-gcc環境において、
-以下のレジスタを使用してください。
-
-方向設定:
-
-PORTA.DIR
-
-出力:
-
-PORTA.OUT
-
-入力:
-
-PORTA.IN
-
-または対応するマクロ:
-
-PORTA_DIR
-PORTA_OUT
-PORTA_IN
-
-
-例えばPA6をOUTPUTにする場合:
-
-PORTA.DIR |= (1 << 6);
-
-
-PA6をHIGHにする場合:
-
-PORTA.OUT |= (1 << 6);
-
-
-PA6をLOWにする場合:
-
-PORTA.OUT &= ~(1 << 6);
-
-
-PA6を入力として読む場合:
-
-if (PORTA.IN & (1 << 6))
-{
-    ...
-}
-
-
-ATtiny202ではPA6というビット名を使用せず、
-ビット番号を直接指定してください。
+LoopRTコマンドでは、
+Arduino Nano側のD番号を使用してください。
 
 例えば、
 
-正しい:
+Target PA2
+↓
+Host D7
 
-(1 << 6)
+なので、
 
-禁止:
+Target PA2のピンの状態をLoopRTで観測する場合:
 
-(1 << PA6)
+I(7)
 
+となります。
 
 同様に、
 
-PA2 → bit 2
-PA3 → bit 3
-PA6 → bit 6
+Target PA3 -> Host D8
+なので、
 
+I(8)
 
-============================================================
-5. ATtiny202のレジスタ形式
-============================================================
+Target PA6 -> Host D9
+なので、
 
-ATtiny202用Cコードでは以下の形式を基本としてください。
+I(9)
 
+Target PA7 -> Host D10
+なので、
 
-GPIO OUTPUT:
+I(10)
 
-PORTA.DIR |= (1 << pin);
+Target PA1 -> Host D11
+なので、
 
+I(11)
 
-GPIO HIGH:
+です。
 
-PORTA.OUT |= (1 << pin);
+LoopRTコマンドで、
 
-
-GPIO LOW:
-
-PORTA.OUT &= ~(1 << pin);
-
-
-GPIO INPUT:
-
-PORTA.DIR &= ~(1 << pin);
-
-
-GPIO INPUT READ:
-
-(PORTA.IN & (1 << pin))
-
-
-例えばPA3を入力にする場合:
-
-PORTA.DIR &= ~(1 << 3);
-
-
-PA2をOUTPUTにする場合:
-
-PORTA.DIR |= (1 << 2);
-
-
-PA2をHIGHにする場合:
-
-PORTA.OUT |= (1 << 2);
-
-
-PA2をLOWにする場合:
-
-PORTA.OUT &= ~(1 << 2);
-
-
-============================================================
-6. コンパイル可能性
-============================================================
-
-生成するTarget MCUコードは、
-
-#include <avr/io.h>
-
-を使用し、
-
-avr-gcc -mmcu=attiny202
-
-でコンパイル可能でなければなりません。
-
-Arduino APIは使用しないでください。
-
-禁止:
-
-pinMode()
-digitalWrite()
-analogRead()
-analogWrite()
-delay()
-
-Arduino Core依存のコードは禁止です。
-
-
-必ず完全なCコードを生成してください。
-
-例えば、
-
-DDRA |= ...
-
-のようなコード断片だけを生成してはいけません。
-
-必ず、
-
-#include <avr/io.h>
-
-int main(void)
-{
-    ...
-    
-    while (1)
-    {
-    }
-}
-
-のようにmain()を含む完全なプログラムにしてください。
-
-============================================================
-19. 出力形式
-============================================================
-
-今回はTarget MCUのCコードだけを生成してください。
-
-必ず以下の形式だけで回答してください。
-
-===CODE===
-完全なATtiny202用Cコード
-===END===
-
-説明文は禁止です。
-
-Markdownのコードブロックは禁止です。
-
-===CODE=== と ===END=== は
-必ず正確に出力してください。
-
-
-============================================================
-20. 最重要チェック
-============================================================
-
-回答を生成する前に、必ず以下を内部的に確認してください。
-
-[Target Cコード]
-
-1. ATtiny202用か？
-2. #include <avr/io.h> があるか？
-3. main()があるか？
-4. DDRAを使用していないか？
-5. 旧AVR形式のPORTAレジスタ操作をしていないか？
-6. PA6という未定義シンボルを使用していないか？
-7. PORTA.DIR / PORTA.OUT / PORTA.IN を使用しているか？
-8. GPIO bit番号は2, 3, 6を正しく使用しているか？
-9. avr-gcc -mmcu=attiny202でコンパイル可能か？
-10. Arduino APIを使用していないか？
-
-
-============================================================
-21. 生成例
-============================================================
-
-例えば、
-
-「ATtiny202のPA6をHIGHにする」
-
-という要求なら、以下のように生成してください。
-
-
-===CODE===
-#include <avr/io.h>
-
-int main(void)
-{
-    PORTA.DIR |= (1 << 6);
-    PORTA.OUT |= (1 << 6);
-
-    while (1)
-    {
-    }
-}
-===END===
-
-
-============================================================
-22. 絶対禁止事項まとめ
-============================================================
-
-以下のシンボルをCコード中で使用してはいけません。
-ただし、説明文やユーザー要求に含まれる「PA2」「PA3」「PA6」というピン名そのものは禁止ではありません。
-
-DDRA
-DDRB
-DDRC
-
-PORTA |= ...
-PORTA &= ...
-PORTB
-PORTC
-
+D7
+D8
+D9
 PA2
 PA3
-PA6
 
-(1 << PA2)
-(1 << PA3)
-(1 << PA6)
+などの表記をpin番号として使用してはいけません。
 
-pinMode()
-digitalWrite()
-analogRead()
-analogWrite()
-delay()
+必ず10進数のHost MCUピン番号を使用してください。
 
-delay_us()
-write()
-read()
-wait()
-trigger()
-
-LoopRT仕様の変更
-
-
-ATtiny202では、
-
-PORTA.DIR
-PORTA.OUT
-PORTA.IN
-
-と、
-
-(1 << 2)
-(1 << 3)
-(1 << 6)
-
-を使用してください。
-
-
-============================================================
-23. 最終原則
-============================================================
-
-「正しそうな一般的AVRコード」ではなく、
-
-「現在のATtiny202 + avr-gcc -mmcu=attiny202環境で実際にコンパイルできるコード」
-
-を最優先してください。
-
-不明な仕様を推測してはいけません。
-
-最小限で実機検証可能なコードを生成してください。
-"""
-
-EXPERIMENT_SYSTEM_PROMPT = """
-
-
-あなたはLoopRTの実機実験コマンドを生成するAIです。
-
-目的:
-与えられたTarget Cコードが、実機上で意図した動作をしているか確認するための
-最小限のLoopRTコマンドを生成してください。
-
-Target MCU:
-- ATtiny202
-
-Host MCU:
-- Arduino Nano
-- LoopRTが動作している
-
-物理配線:
-
-Target PA2 <-> Host D7
-Target PA3 <-> Host D8
-Target PA6 <-> Host D9
-
-TargetとHostのピン対応:
-
-- Target PA2 -> Host D7
-- Target PA3 -> Host D8
-- Target PA6 -> Host D9
-
-重要:
-LoopRTで指定するpin番号は、必ずArduino Nano側の数字です。
-
-例:
-- Target PA2を観測する -> I(7)
-- Target PA3を観測する -> I(8)
-- Target PA6を観測する -> I(9)
-
-LoopRT commands:
+==============================
+6. LoopRTコマンド
+==============================
 
 H(pin)
+
 Host側の指定pinをHIGHにする。
 
 L(pin)
+
 Host側の指定pinをLOWにする。
 
 D(ms)
-指定した時間だけ待つ。
+
+指定した時間だけ待機する。
 
 I(pin)
+
 Host側の指定pinのデジタル状態を観測する。
 
 P(pin,duty)
+
 Host側の指定pinにPWMを出力する。
+
 dutyは0〜100のパーセント。
 
 PI(pin)
-Host側のPWM信号を観測する。
+
+Host側の指定pinに入力されているPWM信号を観測する。
 
 E
-実験を終了する。
 
-コマンドの文法:
+デバッグを終了する。
 
-pinには必ず10進数の整数だけを指定してください。
+==============================
+7. LoopRTを使ったデバッグ
+==============================
 
-正しい:
-I(7)
-I(8)
-I(9)
-H(7)
-L(7)
-P(9,50)
-PI(9)
+重要:
 
-間違い:
-I(D7)
-I(PA2)
-H(D7)
-H(PA2)
+LoopRTコマンドは、
+単なる「コード実行用コマンド」ではありません。
 
-「D7」「D8」「D9」のような表記は使用禁止です。
-必ず「7」「8」「9」と書いてください。
+Target MCUの実機動作を確認するための
+デバッグ手順として設計してください。
 
-実験コマンド生成ルール:
+コードを書いたら、
 
-1. Target Cコードを読んで、実機で確認すべき動作を判断してください。
+「このコードが本当にUSER_REQUESTどおり動作しているか」
 
-2. Cコードが特定のGPIOをHIGHまたはLOWに設定している場合、
-   対応するHost pinをI(pin)で観測してください。
+を確認するためにLoopRTコマンドを作成してください。
 
-3. CコードがPWMを生成している場合、
-   対応するHost pinをPI(pin)で観測してください。
+デバッグでは、
 
-4. Cコードの動作確認に不要なコマンドは追加しないでください。
+（入力→）Target MCUの処理→出力
 
-5. 特に必要がない限りD(ms)は使用しないでください。
-   静的なGPIO出力の確認では、通常D()は不要です。
+という実際の動作を確認してください。
 
-6. H()やL()は、Target Cコードの出力を確認するために必要な場合だけ使用してください。
-   TargetのGPIO出力を観測するだけなら、H()やL()は不要です。
+==============================
+8. デバッグコードはコードと一体として考える
+==============================
 
-7. 実験では、確認に必要な観測コマンドを実行した後、Eで終了してください。
+Target MCU用CコードとLoopRTコマンドを
+別々の仕事として考えないでください。
 
-8. 何も観測せずにEだけを出力しないでください。
-   Target Cコードから確認可能な動作がある場合は、必ず対応する観測コマンドを含めてください。
+LoopRTコマンドは、
+作成したCコードを実機でデバッグするための
+デバッグコードです。
 
-9. 必要以上に長い実験シーケンスを作らないでください。
+したがって、
 
-例:
-"role": "user", "content": "ATtiny202のPA2をHIGHにするコードを作成してください。"
-この場合、Target PA2はHIGH出力なので、
-Host D7を観測します。
+「このCコードに対して、
+どのような入力を与え、
+どのタイミングで、
+何を観測すれば、
+USER_REQUESTを満たしていることを確認できるか」
 
-正しい出力:
+を考えてLoopRTコマンドを作成してください。
+
+コードの動作に時間的な変化がある場合は、
+その時間変化もデバッグしてください。
+
+例えば、
+
+・フェード
+・タイマー
+・遅延
+・周期動作
+・状態遷移
+・入力イベントによる動作
+
+などは、
+時間を考慮したデバッグ手順を作成してください。
+
+静的なGPIO確認だけで
+時間的な動作を確認したことにしてはいけません。
+
+==============================
+9. 入力イベントのデバッグ
+==============================
+
+Target MCUの入力ピンをHost MCUから制御している場合、
+H()とL()、D()を使用して入力イベントを作ってください。
+
+例えば、PA3にスイッチ入力などの入力イベントをデバッグする場合、
+
+Target PA3 -> Host D8
+
+であり、
+PA3のLOWからHIGHへの変化を検出するコードの場合、
+
+L(8)
+D(100)
+H(8)
+D(100)
+L(8)
+
+によってLOW->HIGH->LOWのスイッチ入力イベントを作ることができます。
+
+入力イベントを検出するコードをデバッグするときは、
+必要な入力状態と入力遷移を明確に作ってください。
+
+==============================
+10. 時間的な動作のデバッグ
+==============================
+
+USER_REQUESTが時間的な動作を要求している場合、
+D(ms)を使用して実際の時間経過を作ってください。
+
+例えば、
+
+「10秒かけてフェードする」
+
+という要求で、
+
+Target PA2がPWMを生成し、
+Target PA2 -> Host D7
+
+としてLoopRTからPWMを観測する場合、
+
+PI(7)
+
+を使用してください。
+
+例えば、
+
+PA3のLOW->HIGHをトリガーとして
+PA2のPWMフェードインを開始するコードの場合、
+
+以下のようなデバッグコマンドを作ることができます。
+
+L(8)
+D(100)
+H(8)
+D(1000)
+PI(7)
+D(4000)
+PI(7)
+D(5000)
+PI(7)
+
+これは、
+
+PA3 LOW
+↓
+100ms
+↓
+PA3 HIGH
+↓
+1秒待機
+↓
+PA2のPWMを観測
+↓
+4秒待機
+↓
+PA2のPWMを観測
+↓
+5秒待機
+↓
+PA2のPWMを観測
+
+というデバッグになります。
+
+10秒のフェードであれば、
+
+開始直後
+↓
+途中
+↓
+終了付近
+↓
+終了後
+
+のように複数の観測点を作り、
+時間変化そのものを確認してください。
+
+==============================
+11. デバッグ結果の判断
+==============================
+
+LoopRTから返されたRAW LOGを、
+USER_REQUESTと比較してください。
+
+デバッグログには、
+
+・期待した入力が入っているか
+・期待した出力になっているか
+・期待したタイミングで状態が変化しているか
+・PWMが期待した状態になっているか
+・GPIOが期待した状態になっているか
+
+などを確認できる情報があります。
+
+ログとUSER_REQUESTが一致しない場合、
+その原因を考えてください。
+
+原因として、
+
+・Target Cコードの問題
+・LoopRTコマンドの問題
+・入力イベントの作り方の問題
+・観測方法の問題
+・タイミングの問題
+
+などを区別してください。
+
+問題がコードにある場合は、
+Target MCU用Cコードを修正してください。
+
+問題がデバッグ手順にある場合は、
+LoopRTコマンドを修正してください。
+
+コードが正しいのに、
+デバッグ方法が間違っている場合は、
+不要にCコードを書き換えないでください。
+
+==============================
+12. デバッグ中の入力変化
+==============================
+
+USER_REQUESTに、
+
+「特定の入力イベント中だけ動作する」
+「処理中は入力を無視する」
+
+などの条件がある場合、
+その条件もデバッグしてください。
+
+ただし、
+基本動作確認と、
+特殊な異常系・無視動作の確認を混同しないでください。
+
+まずUSER_REQUESTの基本動作が成立しているか確認してください。
+
+その後、
+必要であれば追加の入力イベントを与えて、
+入力無視などの仕様を確認してください。
+
+==============================
+13. デバッグ結果からの修正ループ
+==============================
+LoopRTのRAW LOGを確認し、
+USER_REQUESTを満たしていない場合は、
+そこで作業を終了してはいけません。
+
+RAW LOGから、
+
+1. 実際に何が起きたか
+2. 何が期待どおりではなかったか
+3. その原因として何が考えられるか
+4. 次のデバッグで何を確認すれば原因を特定できるか
+
+を判断してください。
+
+特に、
+
+「出力が出ない」
+
+という結果だけを見て、
+すぐに出力処理のコードを修正してはいけません。
+
+例えば、
+
+入力
+↓
+入力認識
+↓
+状態遷移
+↓
+内部処理
+↓
+出力
+
+のどの段階で問題が発生しているかを考えてください。
+
+原因がコードにあると考えられる場合は、
+コードを修正してください。
+
+原因がLoopRTコマンドにあると考えられる場合は、
+LoopRTコマンドを修正してください。
+
+原因がまだ特定できない場合は、
+原因を切り分けるためのデバッグコマンドを作成してください。
+
+デバッグ結果を受け取ったら、
+
+「前回の仮説」
+→「RAW LOG」
+→「原因の判断」
+→「コードまたはデバッグ手順の修正」
+
+というループを繰り返してください。
+
+1回のデバッグ結果だけで、
+原因が特定できない場合があります。
+
+その場合は、
+追加のデバッグを行ってください。
+
+USER_REQUESTを満たしていることが確認できるまで、
+コード生成だけで終了せず、
+LoopRTを使用した実機デバッグを継続してください。
+
+また、コードを修正する場合は、
+RAW LOGから確認できる事実と、
+AIが推測している原因を混同しないでください。
+
+例えば、
+
+「PI(7)がTimeoutした」
+
+ことは事実ですが、
+
+「PWM生成処理が壊れている」
+
+ことは、そのログだけでは確定できません。
+
+入力イベントが認識されていない、
+状態遷移していない、
+PWMが開始されていない、
+観測方法が間違っている、
+
+などの可能性を考慮して原因を切り分けてください。
+
+修正後は、
+修正したコードとデバッグコマンドを出力し、
+再び実機で検証してください。
+
+
+
+==============================
+14. 出力形式
+==============================
+
+初回は以下の形式で出力してください。
+
+===CODE===
+完全なCコード
 ===COMMANDS===
-I(7)
-E
+LoopRTデバッグコマンドを1行ずつ
 ===END===
 
-出力形式:
+デバッグログを受け取って修正する場合は、
 
+===STATUS===
+DONE または REPAIR
+===CODE===
+修正後の完全なCコード
 ===COMMANDS===
-LoopRTコマンドを1行ずつ記述
+修正後のLoopRTデバッグコマンドを1行ずつ
 ===END===
 
 説明文は禁止です。
+
+最終的に、
+コードとLoopRTデバッグコマンドによって
+実機上でUSER_REQUESTを検証できる状態にしてください。
 """
 
-def ask_llm(system_prompt, user_prompt):
-    payload = {
+
+
+USER_REQUEST = r"""
+PA3に0.2秒以上のHIGHを検出したら、PA2を10秒間Fade-In / Fade-Out（インアウトそれぞれ5秒ずつ）するコードを書いてください。
+
+Fade処理中はPA3の入力変化を無視してください。
+
+"""
+
+
+def ask_llm(user_prompt, previous_response_id=None):
+    print("[INFO] Sending request to OpenAI...")
+
+    kwargs = {
         "model": MODEL,
-        "messages": [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt},
-        ],
-        "stream": False,
-        "think": False,
-        "options": {
-            "num_predict": 256,
-        },
+        "instructions": SYSTEM_PROMPT,
+        "input": user_prompt,
     }
 
-    print("[INFO] Sending prompt to Ollama...")
+    if previous_response_id is not None:
+        kwargs["previous_response_id"] = previous_response_id
 
-    response = requests.post(
-        OLLAMA_URL,
-        json=payload,
-        timeout=300,
-    )
+    response = client.responses.create(**kwargs)
 
-    response.raise_for_status()
+    print(f"[INFO] Response ID: {response.id}")
 
-    return response.json()["message"]["content"]
+    return response.id, response.output_text
+
+
+def parse_response(response_text):
+    code_start = "===CODE==="
+    commands_start = "===COMMANDS==="
+    end_marker = "===END==="
+
+    if code_start not in response_text:
+        raise ValueError("===CODE=== が見つかりません。")
+
+    if commands_start not in response_text:
+        raise ValueError("===COMMANDS=== が見つかりません。")
+
+    if end_marker not in response_text:
+        raise ValueError("===END=== が見つかりません。")
+
+    code = response_text.split(
+        code_start, 1
+    )[1].split(
+        commands_start, 1
+    )[0].strip()
+
+    if code.startswith("```"):
+        lines = code.splitlines()
+
+        if lines and lines[0].startswith("```"):
+            lines = lines[1:]
+
+        if lines and lines[-1].strip() == "```":
+            lines = lines[:-1]
+
+        code = "\n".join(lines).strip()
+
+    commands_text = response_text.split(
+        commands_start, 1
+    )[1].split(
+        end_marker, 1
+    )[0].strip()
+
+    commands = [
+        line.strip()
+        for line in commands_text.splitlines()
+        if line.strip()
+    ]
+
+    return code, commands
 
 
 def save_generated_files(code, commands):
     GENERATED_DIR.mkdir(exist_ok=True)
 
-    SOURCE_PATH.write_text(code + "\n", encoding="utf-8")
+    SOURCE_PATH.write_text(
+        code + "\n",
+        encoding="utf-8",
+    )
 
     COMMANDS_PATH.write_text(
         "\n".join(commands) + "\n",
@@ -604,143 +679,7 @@ def save_generated_files(code, commands):
     print(f"[SAVE] Commands:  {COMMANDS_PATH}")
 
 
-    print("[BUILD] Compile successful.")
-
-def parse_code_response(response):
-    start_marker = "===CODE==="
-    end_marker = "===END==="
-
-    if start_marker not in response:
-        raise ValueError("===CODE=== が見つかりません。")
-
-    if end_marker not in response:
-        raise ValueError("===END=== が見つかりません。")
-
-    code = response.split(start_marker, 1)[1]
-    code = code.split(end_marker, 1)[0]
-
-    return code.strip()
-
-def parse_commands_response(response):
-    start_marker = "===COMMANDS==="
-    end_marker = "===END==="
-
-    if start_marker not in response:
-        raise ValueError("===COMMANDS=== が見つかりません。")
-
-    if end_marker not in response:
-        raise ValueError("===END=== が見つかりません。")
-
-    commands_text = response.split(start_marker, 1)[1]
-    commands_text = commands_text.split(end_marker, 1)[0]
-
-    commands = [
-        line.strip()
-        for line in commands_text.splitlines()
-        if line.strip()
-    ]
-
-    return commands
-
-
-if __name__ == "__main__":
-
-    user_request = "ATtiny202のPA2をHIGH、PA3をLOWにするコードを作成してください。"
-
-    code_prompt = f"""
-    ===USER REQUEST===
-    {user_request}
-    ===END USER REQUEST===
-    出力は以下の形式に従ってください。
-
-    ===CODE===
-    完全なCコード
-    ===END===
-    """
-
-
-    # ============================================================
-    # 1. Cコード生成
-    # ============================================================
-
-    code_response = ask_llm(
-        SYSTEM_PROMPT,
-        code_prompt,
-    )
-
-    print("========== GENERATED CODE RESPONSE ==========")
-    print(code_response)
-
-    code = parse_code_response(code_response)
-
-    print("========== GENERATED CODE ==========")
-    print(code)
-
-
-    # ============================================================
-    # 2. 実験コマンド生成
-    # ============================================================
-
-    experiment_prompt = f"""
-    ユーザーの要求:
-    ===USER REQUEST===
-    {user_request}
-    ===END USER REQUEST===
-
-    この要求が実機上で実現されているか確認するための
-    LoopRT commandsを生成してください。
-
-    出力は以下の形式に従ってください。
-    ===COMMANDS===
-    LoopRT commandsを1行ずつ記述
-    ===END===
-    """
-
-    commands_response = ask_llm(
-        EXPERIMENT_SYSTEM_PROMPT,
-        experiment_prompt,
-    )
-
-    print("========== GENERATED COMMAND RESPONSE ==========")
-    print(commands_response)
-
-    commands = parse_commands_response(commands_response)
-
-    print("========== GENERATED COMMANDS ==========")
-    for command in commands:
-        print(command)
-
-
-    # ============================================================
-    # 3. 保存
-    # ============================================================
-
-    save_generated_files(code, commands)
-
-
-    # ============================================================
-    # 4. TargetへFlash
-    # ============================================================
-
-    print("[FLASH] Flashing generated code...")
-    flash_target(SOURCE_PATH)
-
-
-    # ============================================================
-    # 5. LoopRT実験
-    # ============================================================
-
-    print("========== GENERATED COMMAND RESPONSE ==========")
-    print(commands_response)
-
-    commands = parse_commands_response(commands_response)
-
-    print("========== GENERATED COMMANDS ==========")
-    for command in commands:
-        print(command)
-
-    print("[RUN] Running LoopRT experiment...")
-
+def run_experiment(commands):
     port = detect_nano_port()
 
     commands_with_newline = [
@@ -748,10 +687,129 @@ if __name__ == "__main__":
         for command in commands
     ]
 
-    result = send_commands(
+    return send_commands(
         port,
         commands_with_newline,
     )
 
-    print("[RESULT]")
+
+if __name__ == "__main__":
+
+    # ============================================================
+    # 1. 初回コード生成
+    # ============================================================
+
+    response_id, response_text = ask_llm(
+        USER_REQUEST
+    )
+
+    print("\n========== LLM RESPONSE ==========")
+    print(response_text)
+
+    code, commands = parse_response(response_text)
+
+    print("\n========== GENERATED CODE ==========")
+    print(code)
+
+    print("\n========== GENERATED COMMANDS ==========")
+    for command in commands:
+        print(command)
+
+
+    # ============================================================
+    # 2. 保存
+    # ============================================================
+
+    save_generated_files(
+        code,
+        commands,
+    )
+
+
+    # ============================================================
+    # 3. TargetへFlash
+    # ============================================================
+
+    print("\n[FLASH] Flashing generated code...")
+
+    try:
+        flash_target(SOURCE_PATH)
+
+    except Exception as e:
+        error_text = str(e)
+
+        print("\n========== FLASH ERROR ==========")
+        print(error_text)
+
+        # エラーをAIへ返す
+        response_id, response_text = ask_llm(
+            f"""
+実機へのFlashでエラーが発生しました。
+
+RAW ERROR:
+{error_text}
+
+エラー原因を確認し、必要ならCコードとcommandsを修正してください。
+""",
+            previous_response_id=response_id,
+        )
+
+    print("\n========== REPAIR RESPONSE ==========")
+    print(response_text)
+
+    repaired_code, repaired_commands = parse_response(response_text)
+
+    save_generated_files(
+        repaired_code,
+        repaired_commands,
+    )
+
+    print("[REPAIR] Generated files updated.")
+
+    flash_target(SOURCE_PATH)
+
+
+    # ============================================================
+    # 4. LoopRT実験
+    # ============================================================
+
+    print("\n[RUN] Running LoopRT experiment...")
+
+    try:
+        result = run_experiment(commands)
+
+    except Exception as e:
+        result = f"LoopRT ERROR:\n{e}"
+
+    print("\n========== RAW LOOPRT RESULT ==========")
     print(result)
+
+
+    # ============================================================
+    # 5. 実験結果をAIへ送る
+    # ============================================================
+
+    response_id, response_text = ask_llm(
+        f"""
+実機実験が終了しました。
+
+以下が実機から取得したRAW LOGです。
+
+===RAW LOG===
+{result}
+===END RAW LOG===
+
+この結果をユーザー要求と比較してください。
+
+要求を満たしていればDONE、
+満たしていなければREPAIRとしてください。
+
+REPAIRの場合は、必要なCコードとcommandsを修正してください。
+
+出力形式を厳守してください。
+""",
+        previous_response_id=response_id,
+    )
+
+    print("\n========== EVALUATION RESPONSE ==========")
+    print(response_text)
