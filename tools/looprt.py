@@ -5,6 +5,8 @@ import time
 def send_commands(port, commands, baudrate=115200):
     ser = serial.Serial(port, baudrate, timeout=1)
 
+    result_lines = []
+
     try:
 
         # =====================================================
@@ -57,6 +59,8 @@ def send_commands(port, commands, baudrate=115200):
 
                 print(f"[LOOPRT] {line}")
 
+                result_lines.append(line)
+
                 if line == "[DONE]":
 
                     elapsed_time = (
@@ -90,8 +94,10 @@ def send_commands(port, commands, baudrate=115200):
 
             print(f"[LOOPRT] {line}")
 
+            result_lines.append(line)
+
             if line == "Experiment End":
-                return line
+                return "\n".join(result_lines)
 
     finally:
         ser.close()
