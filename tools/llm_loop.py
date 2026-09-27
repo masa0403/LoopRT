@@ -1,4 +1,5 @@
 from pathlib import Path
+from datetime import datetime
 
 from openai import OpenAI
 
@@ -8,263 +9,37 @@ from nano_port import detect_nano_port
 from prompts2 import SYSTEM_PROMPT, USER_REQUEST
 
 
+# ============================================================
+# Configuration
+# ============================================================
+
 MODEL = "gpt-5.6-luna"
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-GENERATED_DIR = PROJECT_ROOT / "generated"
+RUNS_DIR = PROJECT_ROOT / "runs"
 
-SOURCE_PATH = GENERATED_DIR / "generated.c"
-COMMANDS_PATH = GENERATED_DIR / "commands.txt"
-COMMENTS_PATH = GENERATED_DIR / "comments.txt"
-
-MAX_REPAIRS = 3
-
-
-client = OpenAI()
+MAX_REPAIRS = 5
 
 
 # ============================================================
 # OpenAI
 # ============================================================
 
-def ask_llm(user_prompt, previous_response_id=None):
-    print("[INFO] Sending request to OpenAI...")
-
-    kwargs = {
-        "model": MODEL,
-        "instructions": SYSTEM_PROMPT,
-        "input": user_prompt,
-    }
-
-    if previous_response_id is not None:
-        kwargs["previous_response_id"] = previous_response_id
-
-    response = client.responses.create(**kwargs)
-
-    print(f"[INFO] Response ID: {response.id}")
-
-    return response.id, response.output_text
+client = OpenAI()
 
 
-# ============================================================
-# LLM Response Parser
-# ============================================================
-
-def parse_response(response_text):
-    code_start = "===CODE==="
-    commands_start = "===COMMANDS==="
-    comment_start = "===COMMENT==="
-    status_start = "===STATUS==="
-    end_marker = "===END==="
-
-    if status_start not in response_text:
-        raise ValueError("===STATUS=== が見つかりません。")
-
-    if end_marker not in response_text:
-        raise ValueError("===END=== が見つかりません。")
-
-    # --------------------------------------------------------
-    # STATUS
-    # --------------------------------------------------------
-
-    status_text = response_text.split(
-        status_start,
-        1,
-    )[1].split(
-        end_marker,
-        1,
-    )[0].strip()
-
-    status = None
-
-    for line in status_text.splitlines():
-        line = line.strip()
-
-        if line in ("DONE", "REPAIR"):
-            status = line
-            break
-
-    if status is None:
-        raise ValueError("DONE または REPAIR が見つかりません。")
-
-    # --------------------------------------------------------
-    # COMMENT
-    # --------------------------------------------------------
-
-    comment = ""
-
-    if comment_start in response_text:
-        comment = response_text.split(
-            comment_start,
-            1,
-        )[1].split(
-            status_start,
-            1,
-        )[0].strip()
-
-    # --------------------------------------------------------
-    # DONE
-    # --------------------------------------------------------
-    #
-    # DONEの場合、CODE / COMMANDSは不要。
-    # ここで正常に返す。
-    #
-
-    if status == "DONE":
-        return None, None, comment, status
-
-    # --------------------------------------------------------
-    # REPAIR
-    # --------------------------------------------------------
-    #
-    # REPAIRの場合はCODE / COMMANDSが必要。
-    #
-
-    if code_start not in response_text:
-        raise ValueError(
-            "REPAIRレスポンスに===CODE===がありません。"
-        )
-
-    if commands_start not in response_text:
-        raise ValueError(
-            "REPAIRレスポンスに===COMMANDS===がありません。"
-        )
-
-    # --------------------------------------------------------
-    # CODE
-    # --------------------------------------------------------
-
-    code = response_text.split(
-        code_start,
-        1,
-    )[1].split(
-        commands_start,
-        1,
-    )[0].strip()
-
-    if code.startswith("```"):
-        lines = code.splitlines()
-
-        if lines and lines[0].startswith("```"):
-            lines = lines[1:]
-
-        if lines and lines[-1].strip() == "```":
-            lines = lines[:-1]
-
-        code = "\n".join(lines).strip()
-
-    # --------------------------------------------------------
-    # COMMANDS
-    # --------------------------------------------------------
-
-    commands_text = response_text.split(
-        commands_start,
-        1,
-    )[1].split(
-        comment_start,
-        1,
-    )[0].strip()
-
-    commands = [
-        line.strip()
-        for line in commands_text.splitlines()
-        if line.strip()
-    ]
-
-    return code, commands, comment, status
-
-
-# ============================================================
-# Current Generated Files
-# ============================================================
-
-def save_current_files(code, commands):
-    GENERATED_DIR.mkdir(exist_ok=True)
-
-    SOURCE_PATH.write_text(
-        code + "\n",
-        encoding="utf-8",
+def ask_llm(user_input, previous_response_id=None):
+    response = client.responses.create(
+        model=MODEL,
+        instructions=SYSTEM_PROMPT,
+        input=user_input,
+        previous_response_id=previous_response_id,
     )
 
-    COMMANDS_PATH.write_text(
-        "\n".join(commands) + "\n",
-        encoding="utf-8",
-    )
-
-    print(f"[SAVE] C source: {SOURCE_PATH}")
-    print(f"[SAVE] Commands:  {COMMANDS_PATH}")
-
+    return response
 
 # ============================================================
-# Generation History
-# ============================================================
-
-def save_generation(generation, code, commands):
-    GENERATED_DIR.mkdir(exist_ok=True)
-
-    source_path = GENERATED_DIR / f"generated_{generation}.c"
-    commands_path = GENERATED_DIR / f"commands_{generation}.txt"
-
-    source_path.write_text(
-        code + "\n",
-        encoding="utf-8",
-    )
-
-    commands_path.write_text(
-        "\n".join(commands) + "\n",
-        encoding="utf-8",
-    )
-
-    print(f"[SAVE] Generation C:        {source_path}")
-    print(f"[SAVE] Generation commands: {commands_path}")
-
-    return source_path, commands_path
-
-
-# ============================================================
-# Comments
-# ============================================================
-
-def append_comment(generation, status, comment):
-    if not comment:
-        return
-
-    GENERATED_DIR.mkdir(exist_ok=True)
-
-    with COMMENTS_PATH.open(
-        "a",
-        encoding="utf-8",
-    ) as f:
-        f.write(
-            f"=== GENERATION {generation} / {status} ===\n"
-        )
-        f.write(comment)
-        f.write("\n\n")
-
-    print(f"[SAVE] Comment: {COMMENTS_PATH}")
-
-
-# ============================================================
-# Debug Log
-# ============================================================
-
-def save_debug_log(generation, log_text):
-    GENERATED_DIR.mkdir(exist_ok=True)
-
-    log_path = GENERATED_DIR / f"debug_log_{generation}.txt"
-
-    log_path.write_text(
-        log_text + "\n",
-        encoding="utf-8",
-    )
-
-    print(f"[SAVE] Debug log: {log_path}")
-
-    return log_path
-
-
-# ============================================================
-# LoopRT
+# RUN Experiment
 # ============================================================
 
 def run_experiment(commands):
@@ -282,6 +57,239 @@ def run_experiment(commands):
 
 
 # ============================================================
+# Response Parser
+# ============================================================
+
+def parse_response(text):
+    """
+    LLM response:
+
+    ===CODE===
+    ...
+    ===COMMANDS===
+    ...
+    ===COMMENT===
+    ...
+    ===STATUS===
+    DONE / REPAIR
+    ===END===
+    """
+
+    status_start = text.find("===STATUS===")
+    end_marker = text.find("===END===")
+
+    if status_start == -1:
+        raise RuntimeError("LLM response missing ===STATUS===")
+
+    if end_marker == -1:
+        raise RuntimeError("LLM response missing ===END===")
+
+    status = text[
+        status_start + len("===STATUS==="):end_marker
+    ].strip()
+
+    # --------------------------------------------------------
+    # COMMENT
+    # --------------------------------------------------------
+
+    comment = ""
+
+    comment_start = text.find("===COMMENT===")
+
+    if comment_start != -1:
+        comment_end = text.find("===STATUS===")
+
+        if comment_end != -1:
+            comment = text[
+                comment_start + len("===COMMENT==="):comment_end
+            ].strip()
+
+    # --------------------------------------------------------
+    # DONE
+    # --------------------------------------------------------
+
+    if status == "DONE":
+        return None, None, comment, "DONE"
+
+    # --------------------------------------------------------
+    # REPAIR
+    # --------------------------------------------------------
+
+    if status != "REPAIR":
+        raise RuntimeError(
+            f"Unknown LLM status: {status}"
+        )
+
+    code_start = text.find("===CODE===")
+    commands_start = text.find("===COMMANDS===")
+
+    if code_start == -1:
+        raise RuntimeError(
+            "LLM REPAIR response missing ===CODE==="
+        )
+
+    if commands_start == -1:
+        raise RuntimeError(
+            "LLM REPAIR response missing ===COMMANDS==="
+        )
+
+    code = text[
+        code_start + len("===CODE==="):commands_start
+    ].strip()
+
+    commands_end = text.find("===COMMENT===")
+
+    if commands_end == -1:
+        commands_end = text.find("===STATUS===")
+
+    commands = text[
+        commands_start + len("===COMMANDS==="):commands_end
+    ].strip()
+
+    # --------------------------------------------------------
+    # Remove markdown code fences if LLM added them
+    # --------------------------------------------------------
+
+    if code.startswith("```"):
+        lines = code.splitlines()
+
+        if lines and lines[0].startswith("```"):
+            lines = lines[1:]
+
+        if lines and lines[-1].strip() == "```":
+            lines = lines[:-1]
+
+        code = "\n".join(lines).strip()
+
+    command_list = []
+
+    for line in commands.splitlines():
+        line = line.strip()
+
+        if not line:
+            continue
+
+        if line.startswith("```"):
+            continue
+
+        command_list.append(line)
+
+    return code, command_list, comment, "REPAIR"
+
+
+# ============================================================
+# Run / Generation Directory
+# ============================================================
+
+def create_run_directory():
+    """
+    Create:
+
+    runs/
+    └── YYYYMMDD_HHMMSS/
+    """
+
+    RUNS_DIR.mkdir(exist_ok=True)
+
+    run_name = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+    run_dir = RUNS_DIR / run_name
+
+    run_dir.mkdir(parents=True, exist_ok=False)
+
+    return run_dir
+
+
+def save_request(run_dir):
+    """
+    Save the original USER_REQUEST.
+    """
+
+    path = run_dir / "request.txt"
+
+    path.write_text(
+        USER_REQUEST.strip() + "\n",
+        encoding="utf-8",
+    )
+
+
+def create_generation_directory(run_dir, generation):
+    """
+    Create:
+
+    generation_01/
+    generation_02/
+    ...
+    """
+
+    generation_dir = (
+        run_dir / f"generation_{generation:02d}"
+    )
+
+    generation_dir.mkdir(
+        parents=True,
+        exist_ok=False,
+    )
+
+    return generation_dir
+
+
+def save_generation_files(
+    generation_dir,
+    code,
+    commands,
+):
+    """
+    Save the code and LoopRT commands belonging
+    to this generation.
+    """
+
+    code_path = generation_dir / "code.c"
+    commands_path = generation_dir / "commands.txt"
+
+    code_path.write_text(
+        code + "\n",
+        encoding="utf-8",
+    )
+
+    commands_path.write_text(
+        "\n".join(commands) + "\n",
+        encoding="utf-8",
+    )
+
+
+def save_result(generation_dir, result):
+    """
+    Save the raw result of the generation.
+
+    This can contain:
+    - compiler error
+    - flash error
+    - LoopRT experiment log
+    """
+
+    path = generation_dir / "result.txt"
+
+    path.write_text(
+        result.rstrip() + "\n",
+        encoding="utf-8",
+    )
+
+
+def save_comment(generation_dir, comment):
+    """
+    Save the LLM's judgment for this generation.
+    """
+
+    path = generation_dir / "comment.txt"
+
+    path.write_text(
+        comment.strip() + "\n",
+        encoding="utf-8",
+    )
+
+
+# ============================================================
 # Debug Packet
 # ============================================================
 
@@ -289,65 +297,72 @@ def build_debug_packet(
     generation,
     code,
     commands,
-    result,
     result_type,
+    raw_result,
 ):
     return f"""
-=== DEBUG PACKET ===
+GENERATION: {generation}
 
-GENERATION:
-{generation}
-
-=== USER REQUEST ===
+USER_REQUEST:
 {USER_REQUEST}
 
-=== CURRENT CODE ===
+CURRENT CODE:
+===CODE===
 {code}
 
-=== CURRENT COMMANDS ===
+CURRENT COMMANDS:
+===COMMANDS===
 {chr(10).join(commands)}
 
-=== RESULT TYPE ===
+RESULT TYPE:
 {result_type}
 
-=== RAW RESULT ===
-{result}
+RAW RESULT:
+===RESULT===
+{raw_result}
 
-=== END DEBUG PACKET ===
+============================================================
+TASK
+============================================================
 
-現在のコード、commands、実機結果を比較してください。
+Judge the experiment result against USER_REQUEST.
 
-USER_REQUESTを満たしているか判断してください。
+You must determine whether the requested behavior has been
+successfully verified on the real hardware.
 
-満たしていれば:
+Consider:
 
-===COMMENT===
-今回の実験結果から、要求を満たしたと判断した理由を簡潔に説明してください。
-追加の実験が不要であることも必要に応じて説明してください。
+- Whether the generated C code compiled successfully.
+- Whether the target MCU was flashed successfully.
+- Whether the LoopRT experiment actually executed.
+- Whether the observed hardware behavior matches USER_REQUEST.
+- Whether the timing behavior is correct.
+- Whether input/output behavior is correct.
+- Whether special conditions such as ignored inputs were
+  actually verified.
+- Whether the result is merely a normal operation result,
+  or evidence of an abnormal/error condition.
+- Whether the current result is sufficient to declare DONE.
 
-===STATUS===
-DONE
+If the requested behavior is not yet sufficiently verified,
+make the smallest necessary correction.
 
-満たしていなければ:
+If repair is required, output the COMPLETE corrected C code
+and COMPLETE LoopRT command sequence.
+
+Do not omit unchanged code.
+
+Your response MUST use exactly this structure:
 
 ===CODE===
-完全な修正版Cコード
-
+full C code
 ===COMMANDS===
-修正版LoopRT commands
-
+one LoopRT command per line
 ===COMMENT===
-何が問題だったと判断し、何を変更したのかを要点だけ簡潔に説明してください。
-
+concise explanation of the result and any required change
 ===STATUS===
-REPAIR
-
-重要:
-
-RAW RESULTだけを見て原因を決めつけないでください。
-CURRENT CODEとCURRENT COMMANDSを含めて判断してください。
-
-出力形式を厳守してください。
+DONE or REPAIR
+===END===
 """
 
 
@@ -355,319 +370,407 @@ CURRENT CODEとCURRENT COMMANDSを含めて判断してください。
 # Main
 # ============================================================
 
-if __name__ == "__main__":
+def main():
 
-    GENERATED_DIR.mkdir(exist_ok=True)
+    # --------------------------------------------------------
+    # Create run
+    # --------------------------------------------------------
 
-    previous_response_id = None
+    run_dir = create_run_directory()
 
-    # ========================================================
-    # 1. Initial Generation
-    # ========================================================
+    save_request(run_dir)
 
-    print("\n" + "=" * 60)
-    print("[STEP 1] Initial code generation")
-    print("=" * 60)
+    print()
+    print("============================================================")
+    print("LoopRT LLM Loop")
+    print("============================================================")
+    print(f"[RUN] {run_dir}")
+    print()
 
-    previous_response_id, response_text = ask_llm(
-        USER_REQUEST
+    # --------------------------------------------------------
+    # Initial generation
+    # --------------------------------------------------------
+
+    print("[INFO] Sending initial request to LLM...")
+
+    response = ask_llm(USER_REQUEST)
+
+    previous_response_id = response.id
+
+    code, commands, comment, status = parse_response(
+        response.output_text
     )
 
-    print("\n========== INITIAL LLM RESPONSE ==========")
-    print(response_text)
+    # --------------------------------------------------------
+    # Initial DONE
+    # --------------------------------------------------------
 
-    current_code, current_commands, comment, status = (
-        parse_response(response_text)
-    )
-
-    append_comment(
-        1,
-        status,
-        comment,
-    )
-
-    # 初回からDONEならそのまま終了
     if status == "DONE":
+        generation_dir = create_generation_directory(
+            run_dir,
+            1,
+        )
 
-        print("\n" + "=" * 60)
-        print("[AI DECISION] DONE")
-        print("[DONE] User request satisfied.")
-        print("[STOP] No further experiment will be executed.")
-        print("=" * 60)
+        save_generation_files(
+            generation_dir,
+            "",
+            [],
+        )
 
-        raise SystemExit(0)
+        save_result(
+            generation_dir,
+            "No experiment executed. LLM returned DONE.",
+        )
 
-    # ========================================================
-    # 2. Debug / Repair Loop
-    # ========================================================
+        save_comment(
+            generation_dir,
+            comment,
+        )
+
+        print("[DONE] LLM returned DONE.")
+        return
+
+    # --------------------------------------------------------
+    # Generation loop
+    # --------------------------------------------------------
 
     for repair_count in range(MAX_REPAIRS + 1):
 
         generation = repair_count + 1
 
-        print("\n" + "=" * 60)
-        print(
-            f"[GENERATION {generation}] "
-            f"Repair count: {repair_count}/{MAX_REPAIRS}"
-        )
-        print("=" * 60)
+        print()
+        print("============================================================")
+        print(f"[GENERATION {generation:02d}]")
+        print("============================================================")
 
         # ----------------------------------------------------
-        # Save current generation
+        # Create generation directory
         # ----------------------------------------------------
 
-        save_current_files(
-            current_code,
-            current_commands,
-        )
-
-        save_generation(
+        generation_dir = create_generation_directory(
+            run_dir,
             generation,
-            current_code,
-            current_commands,
         )
 
-        print("\n========== CURRENT CODE ==========")
-        print(current_code)
+        # ----------------------------------------------------
+        # Save code / commands for this generation
+        # ----------------------------------------------------
 
-        print("\n========== CURRENT COMMANDS ==========")
+        save_generation_files(
+            generation_dir,
+            code,
+            commands,
+        )
 
-        for command in current_commands:
-            print(command)
+        print(
+            f"[SAVE] {generation_dir / 'code.c'}"
+        )
+
+        print(
+            f"[SAVE] {generation_dir / 'commands.txt'}"
+        )
 
         # ----------------------------------------------------
         # Flash
         # ----------------------------------------------------
 
-        print("\n[FLASH] Flashing generated code...")
+        print()
+        print("[INFO] Flashing target...")
 
         try:
-            flash_target(SOURCE_PATH)
-
-            flash_result = "Flash successful."
-
-            print("[FLASH] Success.")
+            flash_target(generation_dir / "code.c")
 
         except Exception as e:
 
-            flash_result = (
-                "Flash failed:\n"
-                + str(e)
+            error_text = str(e)
+
+            print()
+            print("[ERROR] Flash failed:")
+            print(error_text)
+
+            # -----------------------------------------------
+            # Save flash result
+            # -----------------------------------------------
+
+            save_result(
+                generation_dir,
+                error_text,
             )
 
-            print("\n========== FLASH ERROR ==========")
-            print(flash_result)
-
-            save_debug_log(
-                generation,
-                flash_result,
-            )
-
-            if repair_count >= MAX_REPAIRS:
-                print(
-                    "\n[STOP] Maximum repair count reached "
-                    "during Flash."
-                )
-                break
-
-            # ------------------------------------------------
-            # Flash error -> LLM repair
-            # ------------------------------------------------
+            # -----------------------------------------------
+            # Ask LLM to repair
+            # -----------------------------------------------
 
             debug_packet = build_debug_packet(
                 generation,
-                current_code,
-                current_commands,
-                flash_result,
-                "FLASH ERROR",
+                code,
+                commands,
+                "FLASH_ERROR",
+                error_text,
             )
 
-            previous_response_id, response_text = ask_llm(
+            print()
+            print("[INFO] Sending flash error to LLM...")
+
+            response = ask_llm(
                 debug_packet,
-                previous_response_id=previous_response_id,
+                previous_response_id,
             )
 
-            print(
-                "\n========== REPAIR RESPONSE =========="
-            )
-            print(response_text)
+            previous_response_id = response.id
 
             (
                 new_code,
                 new_commands,
-                comment,
-                status,
-            ) = parse_response(response_text)
-
-            append_comment(
-                generation,
-                status,
-                comment,
+                new_comment,
+                new_status,
+            ) = parse_response(
+                response.output_text
             )
 
-            print(f"[AI DECISION] {status}")
+            # -----------------------------------------------
+            # Save LLM judgment for THIS generation
+            # -----------------------------------------------
 
-            if status == "DONE":
-                print(
-                    "[STOP] DONE received after Flash result."
-                )
+            save_comment(
+                generation_dir,
+                new_comment,
+            )
+
+            print(
+                f"[SAVE] {generation_dir / 'result.txt'}"
+            )
+
+            print(
+                f"[SAVE] {generation_dir / 'comment.txt'}"
+            )
+
+            # -----------------------------------------------
+            # DONE
+            # -----------------------------------------------
+
+            if new_status == "DONE":
+
+                print()
+                print("[DONE] LLM judged the task complete.")
                 break
 
-            current_code = new_code
-            current_commands = new_commands
+            # -----------------------------------------------
+            # REPAIR
+            # -----------------------------------------------
+
+            code = new_code
+            commands = new_commands
 
             continue
 
         # ----------------------------------------------------
-        # Run LoopRT
+        # Flash succeeded
         # ----------------------------------------------------
 
-        print("\n[RUN] Running LoopRT experiment...")
+        print("[INFO] Flash succeeded.")
+
+        # ----------------------------------------------------
+        # Detect Nano
+        # ----------------------------------------------------
 
         try:
-            result = run_experiment(
-                current_commands
-            )
-
-            result_type = "LOOPRT RESULT"
+            port = detect_nano_port()
 
         except Exception as e:
-            result = (
-                "LoopRT ERROR:\n"
-                + str(e)
+
+            error_text = str(e)
+
+            print()
+            print("[ERROR] Nano detection failed:")
+            print(error_text)
+
+            save_result(
+                generation_dir,
+                error_text,
             )
 
-            result_type = "LOOPRT ERROR"
+            debug_packet = build_debug_packet(
+                generation,
+                code,
+                commands,
+                "HOST_ERROR",
+                error_text,
+            )
 
-        print("\n========== RAW LOOPRT RESULT ==========")
-        print(result)
+            print()
+            print("[INFO] Sending host error to LLM...")
+
+            response = ask_llm(
+                debug_packet,
+                previous_response_id,
+            )
+
+            previous_response_id = response.id
+
+            (
+                new_code,
+                new_commands,
+                new_comment,
+                new_status,
+            ) = parse_response(
+                response.output_text
+            )
+
+            save_comment(
+                generation_dir,
+                new_comment,
+            )
+
+            if new_status == "DONE":
+
+                print()
+                print("[DONE] LLM judged the task complete.")
+                break
+
+            code = new_code
+            commands = new_commands
+
+            continue
 
         # ----------------------------------------------------
-        # Save raw result
+        # Run LoopRT experiment
         # ----------------------------------------------------
 
-        debug_log = (
-            f"=== GENERATION {generation} ===\n\n"
-            f"=== CODE ===\n"
-            f"{current_code}\n\n"
-            f"=== COMMANDS ===\n"
-            f"{chr(10).join(current_commands)}\n\n"
-            f"=== RESULT TYPE ===\n"
-            f"{result_type}\n\n"
-            f"=== RAW RESULT ===\n"
-            f"{result}\n"
+        print()
+        print("[INFO] Running LoopRT experiment...")
+        print()
+
+        try:
+            result = run_experiment(commands)
+
+            # Convert result to string if necessary
+            if not isinstance(result, str):
+                result_text = str(result)
+            else:
+                result_text = result
+
+        except Exception as e:
+
+            result_text = str(e)
+
+            print()
+            print("[ERROR] LoopRT experiment failed:")
+            print(result_text)
+
+            result_type = "LOOPRT_ERROR"
+
+        else:
+
+            result_type = "LOOPRT_RESULT"
+
+        # ----------------------------------------------------
+        # Save raw experiment result
+        # ----------------------------------------------------
+
+        save_result(
+            generation_dir,
+            result_text,
         )
 
-        save_debug_log(
-            generation,
-            debug_log,
+        print()
+        print(
+            f"[SAVE] {generation_dir / 'result.txt'}"
         )
 
         # ----------------------------------------------------
-        # Ask LLM to evaluate
+        # Show result
         # ----------------------------------------------------
 
-        print("\n[AI] Evaluating experiment result...")
+        print()
+        print("========== LOOPRT RESULT ==========")
+        print(result_text)
+        print("====================================")
+
+        # ----------------------------------------------------
+        # Ask LLM to judge result
+        # ----------------------------------------------------
 
         debug_packet = build_debug_packet(
             generation,
-            current_code,
-            current_commands,
-            result,
+            code,
+            commands,
             result_type,
+            result_text,
         )
 
-        previous_response_id, response_text = ask_llm(
+        print()
+        print("[INFO] Sending experiment result to LLM...")
+
+        response = ask_llm(
             debug_packet,
-            previous_response_id=previous_response_id,
+            previous_response_id,
         )
 
-        print(
-            "\n========== EVALUATION RESPONSE =========="
-        )
-        print(response_text)
-
-        # ----------------------------------------------------
-        # Parse evaluation
-        # ----------------------------------------------------
+        previous_response_id = response.id
 
         (
             new_code,
             new_commands,
-            comment,
-            status,
-        ) = parse_response(response_text)
-
-        append_comment(
-            generation,
-            status,
-            comment,
+            new_comment,
+            new_status,
+        ) = parse_response(
+            response.output_text
         )
 
-        print(f"\n[AI DECISION] {status}")
+        # ----------------------------------------------------
+        # Save LLM judgment
+        # ----------------------------------------------------
+
+        save_comment(
+            generation_dir,
+            new_comment,
+        )
+
+        print(
+            f"[SAVE] {generation_dir / 'comment.txt'}"
+        )
 
         # ----------------------------------------------------
         # DONE
         # ----------------------------------------------------
 
-        if status == "DONE":
+        if new_status == "DONE":
 
-            print("\n" + "=" * 60)
-            print("[DONE] User request satisfied.")
-            print("[STOP] No further experiment will be executed.")
-            print("=" * 60)
-
-            # 現在の最終状態を保存
-            save_current_files(
-                current_code,
-                current_commands,
-            )
-
-            break
-
-        # ----------------------------------------------------
-        # Invalid status
-        # ----------------------------------------------------
-
-        if status != "REPAIR":
-
-            print(
-                "\n[ERROR] LLM response did not contain "
-                "a valid STATUS."
-            )
-
-            print("[STOP] Debug loop stopped.")
+            print()
+            print("============================================================")
+            print("[DONE] LoopRT experiment completed.")
+            print("============================================================")
+            print()
+            print(f"[RUN] Results saved to:")
+            print(run_dir)
+            print()
+            print()
+            print("Complete!")
+            print()
 
             break
 
         # ----------------------------------------------------
-        # Repair limit
+        # REPAIR
         # ----------------------------------------------------
 
-        if repair_count >= MAX_REPAIRS:
+        print()
+        print("[REPAIR] LLM requested another generation.")
 
-            print("\n" + "=" * 60)
-            print(
-                "[STOP] Maximum repair count reached."
-            )
-            print("=" * 60)
-
-            break
-
-        # ----------------------------------------------------
-        # Apply repair
-        # ----------------------------------------------------
-
-        print(
-            f"\n[REPAIR] Applying repair "
-            f"{repair_count + 1}/{MAX_REPAIRS}."
-        )
-
-        current_code = new_code
-        current_commands = new_commands
+        code = new_code
+        commands = new_commands
 
     else:
 
-        print(
-            "\n[STOP] Debug loop finished."
-        )
+        print()
+        print("============================================================")
+        print("[STOP] Maximum repair count reached.")
+        print("============================================================")
+        print()
+        print(f"[RUN] Results saved to:")
+        print(run_dir)
+
+
+if __name__ == "__main__":
+    main()
