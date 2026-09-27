@@ -15,14 +15,25 @@ def compile_avr(source: Path, board: str, output_dir: Path, f_cpu: str):
     elf_path = output_dir / f"{board}.elf"
     hex_path = output_dir / f"{board}.hex"
 
-    subprocess.check_call([
-        avr_gcc,
-        "-mmcu=" + tc["mcu"],
-        "-Os",
-        f"-DF_CPU={f_cpu}",
-        "-o", str(elf_path),
-        str(source)
-    ])
+    result = subprocess.run(
+        [
+            avr_gcc,
+            "-mmcu=" + tc["mcu"],
+            "-Os",
+            f"-DF_CPU={f_cpu}",
+            "-o", str(elf_path),
+            str(source)
+        ],
+        capture_output=True,
+        text=True,
+    )
+
+    if result.returncode != 0:
+        raise RuntimeError(
+            "avr-gcc compile error:\n"
+            + result.stdout
+            + result.stderr
+        )
 
     subprocess.check_call([
         avr_objcopy,
