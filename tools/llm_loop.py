@@ -18,7 +18,7 @@ MODEL = "gpt-5.6-luna"
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 RUNS_DIR = PROJECT_ROOT / "runs"
 
-MAX_REPAIRS = 5
+MAX_REPAIRS = 10
 
 
 # ============================================================
