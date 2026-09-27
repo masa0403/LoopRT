@@ -2,10 +2,10 @@ from pathlib import Path
 
 from openai import OpenAI
 
-from llm_parser import parse_llm_response
 from target import flash_target
 from looprt import send_commands
 from nano_port import detect_nano_port
+from prompts2 import SYSTEM_PROMPT, USER_REQUEST
 
 
 MODEL = "gpt-5.6-luna"
@@ -15,587 +15,17 @@ GENERATED_DIR = PROJECT_ROOT / "generated"
 
 SOURCE_PATH = GENERATED_DIR / "generated.c"
 COMMANDS_PATH = GENERATED_DIR / "commands.txt"
+COMMENTS_PATH = GENERATED_DIR / "comments.txt"
+
+MAX_REPAIRS = 3
 
 
 client = OpenAI()
 
 
-SYSTEM_PROMPT = r"""
-あなたは組み込み開発AIです。
-
-あなたの仕事は、Target MCU上で動作するプログラムを作成し、
-LoopRTを使用して実機上でデバッグし、
-ユーザー要求を満たすまでコードを修正することです。
-
-LoopRTは、Target MCUとHost MCUを接続し、
-Target MCUの動作を実機で確認するためのデバッグ環境です。
-
-あなたは単にCコードを生成するAIではありません。
-
-「コードを書く」
-→「LoopRTで実機をデバッグする」
-→「デバッグログから問題を判断する」
-→「必要ならコードまたはデバッグ手順を修正する」
-
-という一連の作業を行ってください。
-
-==============================
-
-1. AIの役割
-==============================
-
-USER_REQUESTに書かれた要求を理解し、
-ATtiny202用のCコードを作成してください。
-
-ただし、コードを作るだけで作業を終了してはいけません。
-
-作成したコードをTarget MCUに実装したものとして、
-LoopRTコマンドを使用して実機上でデバッグしてください。
-
-デバッグでは、
-
-・入力が正しく与えられているか
-・Target MCUが入力を正しく認識しているか
-・内部処理が要求どおり進んでいるか
-・出力が正しく生成されているか
-・時間的な動作が要求どおりか
-
-を確認してください。
-
-デバッグログを確認した結果、
-USER_REQUESTを満たしていない場合は、
-原因を判断してコードを修正してください。
-
-必要であればLoopRTコマンドによるデバッグ手順も修正してください。
-
-==============================
-2. 開発環境
-==============================
-
-Target MCU:
-ATtiny202
-
-Host MCU:
-Arduino Nano
-
-Host MCU:
-LoopRTを実行する
-
-PC:
-PythonからLoopRTへコマンドを送信する
-
-Target MCU:
-生成したCコードをFlashして実機で動作させる
-
-LoopRT本体:
-すでに動作確認済み
-
-今回、LoopRT本体のコードは変更しないでください。
-
-==============================
-3. Target MCUのコードについて
-==============================
-
-USER_REQUESTに応じて、
-Target MCUで動作する完全なCコードを作成してください。
-
-Target MCUのコードでは、
-ATtiny202のPA番号を使用してください。
-
-LoopRT基板の配線や、
-ATtiny202の各ピンの機能を考慮してください。
-
-特に、Target MCUのピンを使用するときは、
-LoopRT基板上の固定配線と矛盾しないようにしてください。
-
-コードを設計するときは、
-
-・GPIO
-・PWM
-・ADC
-・タイマー
-・割り込み
-・USART等の通信機能
-
-など、ATtiny202のハードウェア機能と
-LoopRT基板の配線を考慮してください。
-
-ただし、USER_REQUESTに不要な機能を追加しないでください。
-
-必要最小限のコードで実装してください。
-
-==============================
-4. LoopRT基板の配線
-==============================
-
-現在の物理配線は以下です。
-
-Target PA1 -> Host D11
-Target PA2 -> Host D7
-Target PA3 -> Host D8
-Target PA6 -> Host D9
-Target PA7 -> Host D10
-
-つまり、
-
-Target PA1 <-> Host D11
-Target PA2 <-> Host D7
-Target PA3 <-> Host D8
-Target PA6 <-> Host D9
-Target PA7 <-> Host D10
-
-です。
-
-==============================
-5. TargetとHostのピン番号
-==============================
-
-重要:
-
-Target MCUのCコードでは、
-ATtiny202側のPA番号を使用してください。
-
-LoopRTコマンドでは、
-Arduino Nano側のD番号を使用してください。
-
-例えば、
-
-Target PA2
-↓
-Host D7
-
-なので、
-
-Target PA2のピンの状態をLoopRTで観測する場合:
-
-I(7)
-
-となります。
-
-同様に、
-
-Target PA3 -> Host D8
-なので、
-
-I(8)
-
-Target PA6 -> Host D9
-なので、
-
-I(9)
-
-Target PA7 -> Host D10
-なので、
-
-I(10)
-
-Target PA1 -> Host D11
-なので、
-
-I(11)
-
-です。
-
-LoopRTコマンドで、
-
-D7
-D8
-D9
-PA2
-PA3
-
-などの表記をpin番号として使用してはいけません。
-
-必ず10進数のHost MCUピン番号を使用してください。
-
-==============================
-6. LoopRTコマンド
-==============================
-
-H(pin)
-
-Host側の指定pinをHIGHにする。
-
-L(pin)
-
-Host側の指定pinをLOWにする。
-
-D(ms)
-
-指定した時間だけ待機する。
-
-I(pin)
-
-Host側の指定pinのデジタル状態を観測する。
-
-P(pin,duty)
-
-Host側の指定pinにPWMを出力する。
-
-dutyは0〜100のパーセント。
-
-PI(pin)
-
-Host側の指定pinに入力されているPWM信号を観測する。
-
-E
-
-デバッグを終了する。
-
-==============================
-7. LoopRTを使ったデバッグ
-==============================
-
-重要:
-
-LoopRTコマンドは、
-単なる「コード実行用コマンド」ではありません。
-
-Target MCUの実機動作を確認するための
-デバッグ手順として設計してください。
-
-コードを書いたら、
-
-「このコードが本当にUSER_REQUESTどおり動作しているか」
-
-を確認するためにLoopRTコマンドを作成してください。
-
-デバッグでは、
-
-（入力→）Target MCUの処理→出力
-
-という実際の動作を確認してください。
-
-==============================
-8. デバッグコードはコードと一体として考える
-==============================
-
-Target MCU用CコードとLoopRTコマンドを
-別々の仕事として考えないでください。
-
-LoopRTコマンドは、
-作成したCコードを実機でデバッグするための
-デバッグコードです。
-
-したがって、
-
-「このCコードに対して、
-どのような入力を与え、
-どのタイミングで、
-何を観測すれば、
-USER_REQUESTを満たしていることを確認できるか」
-
-を考えてLoopRTコマンドを作成してください。
-
-コードの動作に時間的な変化がある場合は、
-その時間変化もデバッグしてください。
-
-例えば、
-
-・フェード
-・タイマー
-・遅延
-・周期動作
-・状態遷移
-・入力イベントによる動作
-
-などは、
-時間を考慮したデバッグ手順を作成してください。
-
-静的なGPIO確認だけで
-時間的な動作を確認したことにしてはいけません。
-
-==============================
-9. 入力イベントのデバッグ
-==============================
-
-Target MCUの入力ピンをHost MCUから制御している場合、
-H()とL()、D()を使用して入力イベントを作ってください。
-
-例えば、PA3にスイッチ入力などの入力イベントをデバッグする場合、
-
-Target PA3 -> Host D8
-
-であり、
-PA3のLOWからHIGHへの変化を検出するコードの場合、
-
-L(8)
-D(100)
-H(8)
-D(100)
-L(8)
-
-によってLOW->HIGH->LOWのスイッチ入力イベントを作ることができます。
-
-入力イベントを検出するコードをデバッグするときは、
-必要な入力状態と入力遷移を明確に作ってください。
-
-==============================
-10. 時間的な動作のデバッグ
-==============================
-
-USER_REQUESTが時間的な動作を要求している場合、
-D(ms)を使用して実際の時間経過を作ってください。
-
-例えば、
-
-「10秒かけてフェードする」
-
-という要求で、
-
-Target PA2がPWMを生成し、
-Target PA2 -> Host D7
-
-としてLoopRTからPWMを観測する場合、
-
-PI(7)
-
-を使用してください。
-
-例えば、
-
-PA3のLOW->HIGHをトリガーとして
-PA2のPWMフェードインを開始するコードの場合、
-
-以下のようなデバッグコマンドを作ることができます。
-
-L(8)
-D(100)
-H(8)
-D(1000)
-PI(7)
-D(4000)
-PI(7)
-D(5000)
-PI(7)
-
-これは、
-
-PA3 LOW
-↓
-100ms
-↓
-PA3 HIGH
-↓
-1秒待機
-↓
-PA2のPWMを観測
-↓
-4秒待機
-↓
-PA2のPWMを観測
-↓
-5秒待機
-↓
-PA2のPWMを観測
-
-というデバッグになります。
-
-10秒のフェードであれば、
-
-開始直後
-↓
-途中
-↓
-終了付近
-↓
-終了後
-
-のように複数の観測点を作り、
-時間変化そのものを確認してください。
-
-==============================
-11. デバッグ結果の判断
-==============================
-
-LoopRTから返されたRAW LOGを、
-USER_REQUESTと比較してください。
-
-デバッグログには、
-
-・期待した入力が入っているか
-・期待した出力になっているか
-・期待したタイミングで状態が変化しているか
-・PWMが期待した状態になっているか
-・GPIOが期待した状態になっているか
-
-などを確認できる情報があります。
-
-ログとUSER_REQUESTが一致しない場合、
-その原因を考えてください。
-
-原因として、
-
-・Target Cコードの問題
-・LoopRTコマンドの問題
-・入力イベントの作り方の問題
-・観測方法の問題
-・タイミングの問題
-
-などを区別してください。
-
-問題がコードにある場合は、
-Target MCU用Cコードを修正してください。
-
-問題がデバッグ手順にある場合は、
-LoopRTコマンドを修正してください。
-
-コードが正しいのに、
-デバッグ方法が間違っている場合は、
-不要にCコードを書き換えないでください。
-
-==============================
-12. デバッグ中の入力変化
-==============================
-
-USER_REQUESTに、
-
-「特定の入力イベント中だけ動作する」
-「処理中は入力を無視する」
-
-などの条件がある場合、
-その条件もデバッグしてください。
-
-ただし、
-基本動作確認と、
-特殊な異常系・無視動作の確認を混同しないでください。
-
-まずUSER_REQUESTの基本動作が成立しているか確認してください。
-
-その後、
-必要であれば追加の入力イベントを与えて、
-入力無視などの仕様を確認してください。
-
-==============================
-13. デバッグ結果からの修正ループ
-==============================
-LoopRTのRAW LOGを確認し、
-USER_REQUESTを満たしていない場合は、
-そこで作業を終了してはいけません。
-
-RAW LOGから、
-
-1. 実際に何が起きたか
-2. 何が期待どおりではなかったか
-3. その原因として何が考えられるか
-4. 次のデバッグで何を確認すれば原因を特定できるか
-
-を判断してください。
-
-特に、
-
-「出力が出ない」
-
-という結果だけを見て、
-すぐに出力処理のコードを修正してはいけません。
-
-例えば、
-
-入力
-↓
-入力認識
-↓
-状態遷移
-↓
-内部処理
-↓
-出力
-
-のどの段階で問題が発生しているかを考えてください。
-
-原因がコードにあると考えられる場合は、
-コードを修正してください。
-
-原因がLoopRTコマンドにあると考えられる場合は、
-LoopRTコマンドを修正してください。
-
-原因がまだ特定できない場合は、
-原因を切り分けるためのデバッグコマンドを作成してください。
-
-デバッグ結果を受け取ったら、
-
-「前回の仮説」
-→「RAW LOG」
-→「原因の判断」
-→「コードまたはデバッグ手順の修正」
-
-というループを繰り返してください。
-
-1回のデバッグ結果だけで、
-原因が特定できない場合があります。
-
-その場合は、
-追加のデバッグを行ってください。
-
-USER_REQUESTを満たしていることが確認できるまで、
-コード生成だけで終了せず、
-LoopRTを使用した実機デバッグを継続してください。
-
-また、コードを修正する場合は、
-RAW LOGから確認できる事実と、
-AIが推測している原因を混同しないでください。
-
-例えば、
-
-「PI(7)がTimeoutした」
-
-ことは事実ですが、
-
-「PWM生成処理が壊れている」
-
-ことは、そのログだけでは確定できません。
-
-入力イベントが認識されていない、
-状態遷移していない、
-PWMが開始されていない、
-観測方法が間違っている、
-
-などの可能性を考慮して原因を切り分けてください。
-
-修正後は、
-修正したコードとデバッグコマンドを出力し、
-再び実機で検証してください。
-
-
-
-==============================
-14. 出力形式
-==============================
-
-初回は以下の形式で出力してください。
-
-===CODE===
-完全なCコード
-===COMMANDS===
-LoopRTデバッグコマンドを1行ずつ
-===END===
-
-デバッグログを受け取って修正する場合は、
-
-===STATUS===
-DONE または REPAIR
-===CODE===
-修正後の完全なCコード
-===COMMANDS===
-修正後のLoopRTデバッグコマンドを1行ずつ
-===END===
-
-説明文は禁止です。
-
-最終的に、
-コードとLoopRTデバッグコマンドによって
-実機上でUSER_REQUESTを検証できる状態にしてください。
-"""
-
-
-
-USER_REQUEST = r"""
-PA3に0.2秒以上のHIGHを検出したら、PA2を10秒間Fade-In / Fade-Out（インアウトそれぞれ5秒ずつ）するコードを書いてください。
-
-Fade処理中はPA3の入力変化を無視してください。
-
-"""
-
+# ============================================================
+# OpenAI
+# ============================================================
 
 def ask_llm(user_prompt, previous_response_id=None):
     print("[INFO] Sending request to OpenAI...")
@@ -616,24 +46,100 @@ def ask_llm(user_prompt, previous_response_id=None):
     return response.id, response.output_text
 
 
+# ============================================================
+# LLM Response Parser
+# ============================================================
+
 def parse_response(response_text):
     code_start = "===CODE==="
     commands_start = "===COMMANDS==="
+    comment_start = "===COMMENT==="
+    status_start = "===STATUS==="
     end_marker = "===END==="
 
-    if code_start not in response_text:
-        raise ValueError("===CODE=== が見つかりません。")
-
-    if commands_start not in response_text:
-        raise ValueError("===COMMANDS=== が見つかりません。")
+    if status_start not in response_text:
+        raise ValueError("===STATUS=== が見つかりません。")
 
     if end_marker not in response_text:
         raise ValueError("===END=== が見つかりません。")
 
-    code = response_text.split(
-        code_start, 1
+    # --------------------------------------------------------
+    # STATUS
+    # --------------------------------------------------------
+
+    status_text = response_text.split(
+        status_start,
+        1,
     )[1].split(
-        commands_start, 1
+        end_marker,
+        1,
+    )[0].strip()
+
+    status = None
+
+    for line in status_text.splitlines():
+        line = line.strip()
+
+        if line in ("DONE", "REPAIR"):
+            status = line
+            break
+
+    if status is None:
+        raise ValueError("DONE または REPAIR が見つかりません。")
+
+    # --------------------------------------------------------
+    # COMMENT
+    # --------------------------------------------------------
+
+    comment = ""
+
+    if comment_start in response_text:
+        comment = response_text.split(
+            comment_start,
+            1,
+        )[1].split(
+            status_start,
+            1,
+        )[0].strip()
+
+    # --------------------------------------------------------
+    # DONE
+    # --------------------------------------------------------
+    #
+    # DONEの場合、CODE / COMMANDSは不要。
+    # ここで正常に返す。
+    #
+
+    if status == "DONE":
+        return None, None, comment, status
+
+    # --------------------------------------------------------
+    # REPAIR
+    # --------------------------------------------------------
+    #
+    # REPAIRの場合はCODE / COMMANDSが必要。
+    #
+
+    if code_start not in response_text:
+        raise ValueError(
+            "REPAIRレスポンスに===CODE===がありません。"
+        )
+
+    if commands_start not in response_text:
+        raise ValueError(
+            "REPAIRレスポンスに===COMMANDS===がありません。"
+        )
+
+    # --------------------------------------------------------
+    # CODE
+    # --------------------------------------------------------
+
+    code = response_text.split(
+        code_start,
+        1,
+    )[1].split(
+        commands_start,
+        1,
     )[0].strip()
 
     if code.startswith("```"):
@@ -647,10 +153,16 @@ def parse_response(response_text):
 
         code = "\n".join(lines).strip()
 
+    # --------------------------------------------------------
+    # COMMANDS
+    # --------------------------------------------------------
+
     commands_text = response_text.split(
-        commands_start, 1
+        commands_start,
+        1,
     )[1].split(
-        end_marker, 1
+        comment_start,
+        1,
     )[0].strip()
 
     commands = [
@@ -659,10 +171,14 @@ def parse_response(response_text):
         if line.strip()
     ]
 
-    return code, commands
+    return code, commands, comment, status
 
 
-def save_generated_files(code, commands):
+# ============================================================
+# Current Generated Files
+# ============================================================
+
+def save_current_files(code, commands):
     GENERATED_DIR.mkdir(exist_ok=True)
 
     SOURCE_PATH.write_text(
@@ -679,6 +195,78 @@ def save_generated_files(code, commands):
     print(f"[SAVE] Commands:  {COMMANDS_PATH}")
 
 
+# ============================================================
+# Generation History
+# ============================================================
+
+def save_generation(generation, code, commands):
+    GENERATED_DIR.mkdir(exist_ok=True)
+
+    source_path = GENERATED_DIR / f"generated_{generation}.c"
+    commands_path = GENERATED_DIR / f"commands_{generation}.txt"
+
+    source_path.write_text(
+        code + "\n",
+        encoding="utf-8",
+    )
+
+    commands_path.write_text(
+        "\n".join(commands) + "\n",
+        encoding="utf-8",
+    )
+
+    print(f"[SAVE] Generation C:        {source_path}")
+    print(f"[SAVE] Generation commands: {commands_path}")
+
+    return source_path, commands_path
+
+
+# ============================================================
+# Comments
+# ============================================================
+
+def append_comment(generation, status, comment):
+    if not comment:
+        return
+
+    GENERATED_DIR.mkdir(exist_ok=True)
+
+    with COMMENTS_PATH.open(
+        "a",
+        encoding="utf-8",
+    ) as f:
+        f.write(
+            f"=== GENERATION {generation} / {status} ===\n"
+        )
+        f.write(comment)
+        f.write("\n\n")
+
+    print(f"[SAVE] Comment: {COMMENTS_PATH}")
+
+
+# ============================================================
+# Debug Log
+# ============================================================
+
+def save_debug_log(generation, log_text):
+    GENERATED_DIR.mkdir(exist_ok=True)
+
+    log_path = GENERATED_DIR / f"debug_log_{generation}.txt"
+
+    log_path.write_text(
+        log_text + "\n",
+        encoding="utf-8",
+    )
+
+    print(f"[SAVE] Debug log: {log_path}")
+
+    return log_path
+
+
+# ============================================================
+# LoopRT
+# ============================================================
+
 def run_experiment(commands):
     port = detect_nano_port()
 
@@ -693,123 +281,393 @@ def run_experiment(commands):
     )
 
 
+# ============================================================
+# Debug Packet
+# ============================================================
+
+def build_debug_packet(
+    generation,
+    code,
+    commands,
+    result,
+    result_type,
+):
+    return f"""
+=== DEBUG PACKET ===
+
+GENERATION:
+{generation}
+
+=== USER REQUEST ===
+{USER_REQUEST}
+
+=== CURRENT CODE ===
+{code}
+
+=== CURRENT COMMANDS ===
+{chr(10).join(commands)}
+
+=== RESULT TYPE ===
+{result_type}
+
+=== RAW RESULT ===
+{result}
+
+=== END DEBUG PACKET ===
+
+現在のコード、commands、実機結果を比較してください。
+
+USER_REQUESTを満たしているか判断してください。
+
+満たしていれば:
+
+===COMMENT===
+今回の実験結果から、要求を満たしたと判断した理由を簡潔に説明してください。
+追加の実験が不要であることも必要に応じて説明してください。
+
+===STATUS===
+DONE
+
+満たしていなければ:
+
+===CODE===
+完全な修正版Cコード
+
+===COMMANDS===
+修正版LoopRT commands
+
+===COMMENT===
+何が問題だったと判断し、何を変更したのかを要点だけ簡潔に説明してください。
+
+===STATUS===
+REPAIR
+
+重要:
+
+RAW RESULTだけを見て原因を決めつけないでください。
+CURRENT CODEとCURRENT COMMANDSを含めて判断してください。
+
+出力形式を厳守してください。
+"""
+
+
+# ============================================================
+# Main
+# ============================================================
+
 if __name__ == "__main__":
 
-    # ============================================================
-    # 1. 初回コード生成
-    # ============================================================
+    GENERATED_DIR.mkdir(exist_ok=True)
 
-    response_id, response_text = ask_llm(
+    previous_response_id = None
+
+    # ========================================================
+    # 1. Initial Generation
+    # ========================================================
+
+    print("\n" + "=" * 60)
+    print("[STEP 1] Initial code generation")
+    print("=" * 60)
+
+    previous_response_id, response_text = ask_llm(
         USER_REQUEST
     )
 
-    print("\n========== LLM RESPONSE ==========")
+    print("\n========== INITIAL LLM RESPONSE ==========")
     print(response_text)
 
-    code, commands = parse_response(response_text)
-
-    print("\n========== GENERATED CODE ==========")
-    print(code)
-
-    print("\n========== GENERATED COMMANDS ==========")
-    for command in commands:
-        print(command)
-
-
-    # ============================================================
-    # 2. 保存
-    # ============================================================
-
-    save_generated_files(
-        code,
-        commands,
+    current_code, current_commands, comment, status = (
+        parse_response(response_text)
     )
 
+    append_comment(
+        1,
+        status,
+        comment,
+    )
 
-    # ============================================================
-    # 3. TargetへFlash
-    # ============================================================
+    # 初回からDONEならそのまま終了
+    if status == "DONE":
 
-    print("\n[FLASH] Flashing generated code...")
+        print("\n" + "=" * 60)
+        print("[AI DECISION] DONE")
+        print("[DONE] User request satisfied.")
+        print("[STOP] No further experiment will be executed.")
+        print("=" * 60)
 
-    try:
-        flash_target(SOURCE_PATH)
+        raise SystemExit(0)
 
-    except Exception as e:
-        error_text = str(e)
+    # ========================================================
+    # 2. Debug / Repair Loop
+    # ========================================================
 
-        print("\n========== FLASH ERROR ==========")
-        print(error_text)
+    for repair_count in range(MAX_REPAIRS + 1):
 
-        # エラーをAIへ返す
-        response_id, response_text = ask_llm(
-            f"""
-実機へのFlashでエラーが発生しました。
+        generation = repair_count + 1
 
-RAW ERROR:
-{error_text}
+        print("\n" + "=" * 60)
+        print(
+            f"[GENERATION {generation}] "
+            f"Repair count: {repair_count}/{MAX_REPAIRS}"
+        )
+        print("=" * 60)
 
-エラー原因を確認し、必要ならCコードとcommandsを修正してください。
-""",
-            previous_response_id=response_id,
+        # ----------------------------------------------------
+        # Save current generation
+        # ----------------------------------------------------
+
+        save_current_files(
+            current_code,
+            current_commands,
         )
 
-    print("\n========== REPAIR RESPONSE ==========")
-    print(response_text)
+        save_generation(
+            generation,
+            current_code,
+            current_commands,
+        )
 
-    repaired_code, repaired_commands = parse_response(response_text)
+        print("\n========== CURRENT CODE ==========")
+        print(current_code)
 
-    save_generated_files(
-        repaired_code,
-        repaired_commands,
-    )
+        print("\n========== CURRENT COMMANDS ==========")
 
-    print("[REPAIR] Generated files updated.")
+        for command in current_commands:
+            print(command)
 
-    flash_target(SOURCE_PATH)
+        # ----------------------------------------------------
+        # Flash
+        # ----------------------------------------------------
 
+        print("\n[FLASH] Flashing generated code...")
 
-    # ============================================================
-    # 4. LoopRT実験
-    # ============================================================
+        try:
+            flash_target(SOURCE_PATH)
 
-    print("\n[RUN] Running LoopRT experiment...")
+            flash_result = "Flash successful."
 
-    try:
-        result = run_experiment(commands)
+            print("[FLASH] Success.")
 
-    except Exception as e:
-        result = f"LoopRT ERROR:\n{e}"
+        except Exception as e:
 
-    print("\n========== RAW LOOPRT RESULT ==========")
-    print(result)
+            flash_result = (
+                "Flash failed:\n"
+                + str(e)
+            )
 
+            print("\n========== FLASH ERROR ==========")
+            print(flash_result)
 
-    # ============================================================
-    # 5. 実験結果をAIへ送る
-    # ============================================================
+            save_debug_log(
+                generation,
+                flash_result,
+            )
 
-    response_id, response_text = ask_llm(
-        f"""
-実機実験が終了しました。
+            if repair_count >= MAX_REPAIRS:
+                print(
+                    "\n[STOP] Maximum repair count reached "
+                    "during Flash."
+                )
+                break
 
-以下が実機から取得したRAW LOGです。
+            # ------------------------------------------------
+            # Flash error -> LLM repair
+            # ------------------------------------------------
 
-===RAW LOG===
-{result}
-===END RAW LOG===
+            debug_packet = build_debug_packet(
+                generation,
+                current_code,
+                current_commands,
+                flash_result,
+                "FLASH ERROR",
+            )
 
-この結果をユーザー要求と比較してください。
+            previous_response_id, response_text = ask_llm(
+                debug_packet,
+                previous_response_id=previous_response_id,
+            )
 
-要求を満たしていればDONE、
-満たしていなければREPAIRとしてください。
+            print(
+                "\n========== REPAIR RESPONSE =========="
+            )
+            print(response_text)
 
-REPAIRの場合は、必要なCコードとcommandsを修正してください。
+            (
+                new_code,
+                new_commands,
+                comment,
+                status,
+            ) = parse_response(response_text)
 
-出力形式を厳守してください。
-""",
-        previous_response_id=response_id,
-    )
+            append_comment(
+                generation,
+                status,
+                comment,
+            )
 
-    print("\n========== EVALUATION RESPONSE ==========")
-    print(response_text)
+            print(f"[AI DECISION] {status}")
+
+            if status == "DONE":
+                print(
+                    "[STOP] DONE received after Flash result."
+                )
+                break
+
+            current_code = new_code
+            current_commands = new_commands
+
+            continue
+
+        # ----------------------------------------------------
+        # Run LoopRT
+        # ----------------------------------------------------
+
+        print("\n[RUN] Running LoopRT experiment...")
+
+        try:
+            result = run_experiment(
+                current_commands
+            )
+
+            result_type = "LOOPRT RESULT"
+
+        except Exception as e:
+            result = (
+                "LoopRT ERROR:\n"
+                + str(e)
+            )
+
+            result_type = "LOOPRT ERROR"
+
+        print("\n========== RAW LOOPRT RESULT ==========")
+        print(result)
+
+        # ----------------------------------------------------
+        # Save raw result
+        # ----------------------------------------------------
+
+        debug_log = (
+            f"=== GENERATION {generation} ===\n\n"
+            f"=== CODE ===\n"
+            f"{current_code}\n\n"
+            f"=== COMMANDS ===\n"
+            f"{chr(10).join(current_commands)}\n\n"
+            f"=== RESULT TYPE ===\n"
+            f"{result_type}\n\n"
+            f"=== RAW RESULT ===\n"
+            f"{result}\n"
+        )
+
+        save_debug_log(
+            generation,
+            debug_log,
+        )
+
+        # ----------------------------------------------------
+        # Ask LLM to evaluate
+        # ----------------------------------------------------
+
+        print("\n[AI] Evaluating experiment result...")
+
+        debug_packet = build_debug_packet(
+            generation,
+            current_code,
+            current_commands,
+            result,
+            result_type,
+        )
+
+        previous_response_id, response_text = ask_llm(
+            debug_packet,
+            previous_response_id=previous_response_id,
+        )
+
+        print(
+            "\n========== EVALUATION RESPONSE =========="
+        )
+        print(response_text)
+
+        # ----------------------------------------------------
+        # Parse evaluation
+        # ----------------------------------------------------
+
+        (
+            new_code,
+            new_commands,
+            comment,
+            status,
+        ) = parse_response(response_text)
+
+        append_comment(
+            generation,
+            status,
+            comment,
+        )
+
+        print(f"\n[AI DECISION] {status}")
+
+        # ----------------------------------------------------
+        # DONE
+        # ----------------------------------------------------
+
+        if status == "DONE":
+
+            print("\n" + "=" * 60)
+            print("[DONE] User request satisfied.")
+            print("[STOP] No further experiment will be executed.")
+            print("=" * 60)
+
+            # 現在の最終状態を保存
+            save_current_files(
+                current_code,
+                current_commands,
+            )
+
+            break
+
+        # ----------------------------------------------------
+        # Invalid status
+        # ----------------------------------------------------
+
+        if status != "REPAIR":
+
+            print(
+                "\n[ERROR] LLM response did not contain "
+                "a valid STATUS."
+            )
+
+            print("[STOP] Debug loop stopped.")
+
+            break
+
+        # ----------------------------------------------------
+        # Repair limit
+        # ----------------------------------------------------
+
+        if repair_count >= MAX_REPAIRS:
+
+            print("\n" + "=" * 60)
+            print(
+                "[STOP] Maximum repair count reached."
+            )
+            print("=" * 60)
+
+            break
+
+        # ----------------------------------------------------
+        # Apply repair
+        # ----------------------------------------------------
+
+        print(
+            f"\n[REPAIR] Applying repair "
+            f"{repair_count + 1}/{MAX_REPAIRS}."
+        )
+
+        current_code = new_code
+        current_commands = new_commands
+
+    else:
+
+        print(
+            "\n[STOP] Debug loop finished."
+        )
