@@ -66,21 +66,80 @@ L(8)
 完全なCコード
 ===COMMANDS===
 LoopRTコマンドを1行ずつ
+===COMMENT===
+Follow the instructions in the COMMENT GUIDELINES section below.
 ===STATUS===
 DONE または REPAIR
 ===END===
+
+
+[COMMENT GUIDELINES]
+
+The COMMENT section must follow ALL requirements below.
+
+The following subsections define the required content of COMMENT.
+Include each subsection in the specified order.
+Keep each subsection concise and write "None" when there is no relevant information.
+
+[1. Objective]
+State the overall project goal and what the current experiment is intended to verify.
+
+[2. Changes]
+Summarize the important implementation changes in this generation.
+
+[3. Results]
+Summarize actual experiment results, including measured values when available.
+Clearly distinguish measured facts from assumptions.
+
+[4. Assessment]
+State what has been verified, what remains unverified, and any detected problems.
+Do not claim success without sufficient experimental evidence.
+
+[5. Development Plan]
+Maintain a concise, ordered list of implementation and verification steps.
+For each step, include an ID, a short description, and one status:
+NOT_STARTED, IN_PROGRESS, IMPLEMENTED, VERIFIED, or BLOCKED.
+
+Preserve the existing plan across generations.
+Update statuses only when supported by implementation or experimental evidence.
+Keep completed steps when they are important for understanding the current state.
+
+[6. Current Step]
+Identify the step being worked on and briefly explain why it is the appropriate next step.
+
+[7. Next Action]
+Specify the single most useful next implementation or experiment.
+If the current goal has been achieved and adequately verified, state that no further action is required.
+
+[8. Verification Criteria]
+State the observable conditions required to consider the current step complete.
+Use measurable criteria where possible.
+
+[GENERAL RULES]
+- Treat the user's original request as the overall project goal.
+- Prefer incremental, testable changes over implementing the entire project at once.
+- Diagnose failures before making unrelated changes.
+- If observations are insufficient to identify the cause, propose the smallest experiment that can distinguish between plausible causes.
+- Preserve previously verified functionality unless changing it is necessary.
+- Never mark a step VERIFIED merely because code was generated or compiled. Require relevant experimental evidence.
+- Treat timeouts and missing observations as inconclusive unless other evidence supports a specific interpretation.
+- Use the previous generation's COMMENT as context when available.
+- Do not invent results, measurements, or verification evidence.
+- Keep the report compact and understandable without relying on unstated assumptions.
 """
 
 USER_REQUEST = r"""
-PA2を0.3秒未満だけHIGHにすると、短い1回タッチとして扱い、PA7をその時のDuty比から1秒あたり20％ずつ上昇させて100％にする。
-短い1回タッチを0.5秒感覚で2回PA2にすると、短い2回タッチとして扱い、PA7をその時のDuty比から1秒あたり20％ずつ減少させて0％にする。
-短いタッチによるPA7のDuty比の変化は、100％または0％に達するまで他の入力を無視して続く。
+PA6のADC入力値に応じてPA2のPWMデューティ比を制御してください。
 
-PA2を0.3秒以上HIGHにすると、長い1回タッチとして扱いHIGHされている間PWMをそのDuty比から1秒あたり20％ずつ上昇させる。
-短い1回タッチのあと、0.5秒以内に長い1回タッチが開始された場合、長い2回タッチとして扱い、HIGHされている間PWMをそのDuty比から1秒あたり20％ずつ減少させる。
-長いタッチが終わるとその最後のDuty比を保持する。Duty比100％または0％に達すると、100％または0％を保持する。
+ただし、PA3のデジタル入力状態によって動作モードを切り替えます。
 
-PA2はスイッチとしてできるならプルダウンにする。
+- PA3がLOWのとき：
+  PA6のADC取得値に応じてPA2のPWMデューティ比を制御する。
+- PA3がHIGHのとき：
+  PA2のPWMデューティ比を50%に固定する。
+
+動作中はPA3の状態を繰り返し確認し、モードを切り替えられるようにしてください。
+また、PWM出力はPA2から行い、PA6のADC入力を妨げないようにしてください。
 """
 
 
@@ -93,3 +152,5 @@ PA2はスイッチとしてできるならプルダウンにする。
   D11   PA1          PA2     D7
 
 """
+#source .venv/bin/activate
+#export OPENAI_API_KEY="あなたのAPIキー"

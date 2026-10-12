@@ -1,3 +1,4 @@
+import argparse
 from pathlib import Path
 from datetime import datetime
 
@@ -18,7 +19,7 @@ MODEL = "gpt-5.6-luna"
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 RUNS_DIR = PROJECT_ROOT / "runs"
 
-MAX_REPAIRS = 5
+MAX_REPAIRS = 10
 
 
 # ============================================================
@@ -200,17 +201,133 @@ def create_run_directory():
     return run_dir
 
 
-def save_request(run_dir):
+def save_request(run_dir, user_request):
     """
-    Save the original USER_REQUEST.
+    Save the original user request for this run.
     """
 
     path = run_dir / "request.txt"
 
     path.write_text(
-        USER_REQUEST.strip() + "\n",
+        user_request.strip() + "\n",
         encoding="utf-8",
     )
+
+
+def load_resume_context(generation_path):
+    """
+    Load a previous generation as the starting context
+    for a new LoopRT run.
+
+    Expected structure:
+
+    runs/
+    └── YYYYMMDD_HHMMSS/
+        ├── request.txt
+        └── generation_04/
+            ├── code.c
+            ├── commands.txt
+            ├── comment.txt
+            └── result.txt
+    """
+
+    generation_dir = Path(generation_path).expanduser().resolve()
+
+    if not generation_dir.is_dir():
+        raise FileNotFoundError(
+            f"Generation directory not found: {generation_dir}"
+        )
+
+    run_dir = generation_dir.parent
+    request_path = run_dir / "request.txt"
+
+    required_files = {
+        "request": request_path,
+        "code": generation_dir / "code.c",
+        "commands": generation_dir / "commands.txt",
+        "comment": generation_dir / "comment.txt",
+        "result": generation_dir / "result.txt",
+    }
+
+    for name, path in required_files.items():
+        if not path.is_file():
+            raise FileNotFoundError(
+                f"Required resume file not found ({name}): {path}"
+            )
+
+    context = {
+        name: path.read_text(encoding="utf-8")
+        for name, path in required_files.items()
+    }
+
+    context["generation_dir"] = generation_dir
+
+    return context
+
+
+def build_resume_prompt(context):
+    """
+    Build the initial prompt for resuming from a previous generation.
+    """
+
+    return f"""
+You are continuing a previous LoopRT hardware experiment.
+
+This is a new run. Use the previous files as the starting context.
+Do not restart the task from scratch.
+
+=== ORIGINAL USER REQUEST ===
+
+{context["request"]}
+
+=== PREVIOUS C CODE ===
+
+{context["code"]}
+
+=== PREVIOUS LOOPRT COMMANDS ===
+
+{context["commands"]}
+
+=== PREVIOUS LLM COMMENT ===
+
+{context["comment"]}
+
+=== PREVIOUS EXPERIMENT RESULT ===
+
+{context["result"]}
+
+=== TASK ===
+
+Continue development from the previous generation.
+
+Use the previous code and commands as the starting point.
+Analyze the previous comment and raw experiment result.
+Preserve working parts and make only necessary changes.
+
+The previous experiment may have failed or reached the repair limit.
+Do not assume the requested behavior has been verified.
+
+Generate the complete C code and complete LoopRT command sequence
+for the next experiment.
+
+The next experiment must be executed on real hardware before
+the task can be declared complete.
+
+Your response MUST use exactly this structure:
+
+===CODE===
+full C code
+===COMMANDS===
+one LoopRT command per line
+===COMMENT===
+brief explanation of the previous result and the changes
+===STATUS===
+REPAIR
+===END===
+
+Return REPAIR so the normal LoopRT experiment loop executes.
+Do not declare DONE before the next hardware experiment.
+"""
 
 
 def create_generation_directory(run_dir, generation):
@@ -295,6 +412,7 @@ def save_comment(generation_dir, comment):
 
 def build_debug_packet(
     generation,
+    user_request,
     code,
     commands,
     result_type,
@@ -304,7 +422,7 @@ def build_debug_packet(
 GENERATION: {generation}
 
 USER_REQUEST:
-{USER_REQUEST}
+{user_request}
 
 CURRENT CODE:
 ===CODE===
@@ -359,10 +477,62 @@ full C code
 ===COMMANDS===
 one LoopRT command per line
 ===COMMENT===
-concise explanation of the result and any required change
+Follow the instructions in the COMMENT GUIDELINES section below.
 ===STATUS===
 DONE or REPAIR
 ===END===
+
+
+[COMMENT GUIDELINES]
+
+Write a concise, structured development report using the following sections in order.
+Keep each section brief and avoid repeating the code or full experiment logs.
+
+[Objective]
+State the overall goal and what the current experiment is intended to verify.
+
+[Changes]
+Summarize the important implementation changes in this generation.
+
+[Results]
+Summarize actual experiment results, including measured values when available.
+Clearly distinguish measured facts from assumptions.
+
+[Assessment]
+State what has been verified, what remains unverified, and any detected problems.
+Do not claim success without sufficient experimental evidence.
+
+[Development Plan]
+Maintain a concise, ordered list of implementation and verification steps.
+For each step, include an ID, a short description, and one status:
+NOT_STARTED, IN_PROGRESS, IMPLEMENTED, VERIFIED, or BLOCKED.
+
+Preserve the existing plan across generations.
+Update statuses only when supported by implementation or experimental evidence.
+Keep completed steps when they are important for understanding the current state.
+
+[Current Step]
+Identify the step being worked on and briefly explain why it is the appropriate next step.
+
+[Next Action]
+Specify the single most useful next implementation or experiment.
+If the current goal has been achieved and adequately verified, state that no further action is required.
+
+[Verification Criteria]
+State the observable conditions required to consider the current step complete.
+Use measurable criteria where possible.
+
+[General Rules]
+- Treat the user's original request as the overall project goal.
+- Prefer incremental, testable changes over implementing the entire project at once.
+- Diagnose failures before making unrelated changes.
+- If observations are insufficient to identify the cause, propose the smallest experiment that can distinguish between plausible causes.
+- Preserve previously verified functionality unless changing it is necessary.
+- Never mark a step VERIFIED merely because code was generated or compiled. Require relevant experimental evidence.
+- Treat timeouts and missing observations as inconclusive unless other evidence supports a specific interpretation.
+- Use the previous generation's COMMENT as context when available.
+- Keep the report compact and understandable without relying on unstated assumptions.
+- Do not invent results, measurements, or verification evidence.
 """
 
 
@@ -373,12 +543,54 @@ DONE or REPAIR
 def main():
 
     # --------------------------------------------------------
-    # Create run
+    # Parse arguments
+    # --------------------------------------------------------
+
+    parser = argparse.ArgumentParser(
+        description="LoopRT LLM development loop"
+    )
+
+    parser.add_argument(
+        "resume_generation",
+        nargs="?",
+        help=(
+            "Path to a previous generation directory. "
+            "Example: runs/20261011_214148/generation_04"
+        ),
+    )
+
+    args = parser.parse_args()
+
+    # --------------------------------------------------------
+    # Load initial context
+    # --------------------------------------------------------
+
+    if args.resume_generation:
+        context = load_resume_context(
+            args.resume_generation
+        )
+
+        user_request = context["request"].strip()
+
+        initial_input = build_resume_prompt(context)
+
+        print("[INFO] Resuming from previous generation:")
+        print(context["generation_dir"])
+
+    else:
+        user_request = USER_REQUEST
+        initial_input = USER_REQUEST
+
+    # --------------------------------------------------------
+    # Create new run
     # --------------------------------------------------------
 
     run_dir = create_run_directory()
 
-    save_request(run_dir)
+    save_request(
+        run_dir,
+        user_request,
+    )
 
     print()
     print("============================================================")
@@ -393,7 +605,13 @@ def main():
 
     print("[INFO] Sending initial request to LLM...")
 
-    response = ask_llm(USER_REQUEST)
+    response = ask_llm(initial_input)
+
+    previous_response_id = response.id
+
+    code, commands, comment, status = parse_response(
+        response.output_text
+    )
 
     previous_response_id = response.id
 
@@ -503,6 +721,7 @@ def main():
 
             debug_packet = build_debug_packet(
                 generation,
+                user_request,
                 code,
                 commands,
                 "FLASH_ERROR",
@@ -592,6 +811,7 @@ def main():
 
             debug_packet = build_debug_packet(
                 generation,
+                user_request,
                 code,
                 commands,
                 "HOST_ERROR",
@@ -693,6 +913,7 @@ def main():
 
         debug_packet = build_debug_packet(
             generation,
+            user_request,
             code,
             commands,
             result_type,
