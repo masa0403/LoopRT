@@ -21,6 +21,7 @@ LOOPRT_ROOT = Path(__file__).resolve().parent.parent
 
 CALIB_SOURCE = (
     LOOPRT_ROOT
+    / "firmware"
     / "target"
     / "attiny202"
     / "calibration"
@@ -29,6 +30,7 @@ CALIB_SOURCE = (
 
 CALIB_OUTPUT = (
     LOOPRT_ROOT
+    / "firmware"
     / "target"
     / "attiny202"
     / "build"
