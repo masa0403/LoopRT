@@ -1,0 +1,2 @@
+openai==3.19.2
+pyserial==3.5
