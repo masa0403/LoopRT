@@ -3,4 +3,4 @@ from target import flash_target
 
 
 if __name__ == "__main__":
-    flash_target("generated/generated.c")
+    flash_target("firmware/target/attiny202/test_flash_pa6.c")

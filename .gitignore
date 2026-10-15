@@ -1,2 +1,25 @@
+# Python
 __pycache__/
-*.pyc
+*.py[cod]
+
+# Virtual environments
+.venv/
+venv/
+tools/.venv/
+
+# Environment variables and secrets
+.env
+.env.*
+!.env.example
+
+# Test and tool caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Local tools
+/bin/*
+!/bin/arduino-cli
+
+# Build outputs
+build/
