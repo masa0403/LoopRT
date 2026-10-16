@@ -533,9 +533,7 @@ Use measurable criteria where possible.
 - Use the previous generation's COMMENT as context when available.
 - Keep the report compact and understandable without relying on unstated assumptions.
 - Do not invent results, measurements, or verification evidence.
-なお、LoopRTはATtiny202のGPIO出力やピン状態がユーザーの要求通りに動作しているかを確認するためのツールです。
-そのため、LoopRTのコマンドで確認できないことについての検証が不可能な場合、動作が適切であれば未検証の機能をコメントで明示した上で開発を完了
-（STATUSを"DONE"に）してください。
+
 """
 
 

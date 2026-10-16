@@ -127,23 +127,11 @@ Use measurable criteria where possible.
 - Do not invent results, measurements, or verification evidence.
 - Keep the report compact and understandable without relying on unstated assumptions.
 
-なお、LoopRTはATtiny202のGPIO出力やピン状態がユーザーの要求通りに動作しているかを確認するためのツールです。
-そのため、LoopRTのコマンドで確認できないことについての検証が不可能な場合、動作が適切であれば未検証の機能をコメントで明示した上で開発を完了
-（STATUSを"DONE"に）してください。
 """
 
 USER_REQUEST = r"""
-PA6のADC入力値に応じてPA2のPWMデューティ比を制御してください。
-
-ただし、PA3のデジタル入力状態によって動作モードを切り替えます。
-
-- PA3がLOWのとき：
-  PA6のADC取得値に応じてPA2のPWMデューティ比を制御する。
-- PA3がHIGHのとき：
-  PA2のPWMデューティ比を50%に固定する。
-
-動作中はPA3の状態を繰り返し確認し、モードを切り替えられるようにしてください。
-また、PWM出力はPA2から行い、PA6のADC入力を妨げないようにしてください。
+PA3の立ち上がりエッジを検出したらPA7を0.3秒かけてHIGHまたはLOWにする。
+つまり、PA3の立ち上がりエッジを検出したらPA7の状態を反転させる。PA7の状態反転は0.3秒かけて行う。PA7の状態は初期状態ではLOWである。
 """
 
 

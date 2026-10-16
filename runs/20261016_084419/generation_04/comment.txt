@@ -1,0 +1,35 @@
+[Objective]  
+PA3（Arduino Nano D8）の立ち上がりエッジを検出したら、PA7（Arduino Nano D10）の状態を約300 ms後に反転する動作を実機検証する。
+
+[Changes]  
+Cコードは変更せず、LoopRTコマンドを修正した。前回のコマンドでは`L(10)`によりArduino Nano D10をLOW出力に固定していたため、ATtiny202 PA7がHIGHになってもArduino側からLOWに強制されていた可能性がある。今回、D10を駆動する`L(10)`を削除し、D10は観測だけにした。
+
+[Results]  
+前回のLoopRT実験では、D10は全観測時点でLOWだった。実験は実行されており、修正版コードは少なくとも前回同様にフラッシュされて実行されたと考えられるが、D10がArduino側のLOW出力で拘束されていた可能性がある。PA7が実際にLOWからHIGHへ反転しなかったのか、観測ピンの駆動競合でLOWに見えていたのかは、前回結果だけでは区別できない。
+
+[Assessment]  
+前回の結果では要求動作は未検証である。主な検出された問題は、観測対象であるD10を`L(10)`で外部からLOW駆動していたことである。今回、D10を駆動しないコマンドに変更した。修正版コマンドによる実機結果が得られるまで、成功とは判断しない。
+
+[Development Plan]  
+- P1: PA3入力とPA7初期LOW出力を実装 — VERIFIED  
+- P2: PA3立ち上がりエッジ検出を実装 — IN_PROGRESS  
+- P3: PA7反転制御を実装 — IN_PROGRESS  
+- P4: ATtiny202向けにコンパイルして書き込み可能であることを確認 — VERIFIED  
+- P5: LoopRTで初期PA7がLOWであることを確認 — VERIFIED  
+- P6: 1回目のPA3立ち上がりでPA7が約300 ms後にHIGHになることを確認 — BLOCKED  
+- P7: 2回目のPA3立ち上がりでPA7が約300 ms後にLOWになることを確認 — BLOCKED  
+- P8: D10を外部駆動しない条件でPA7の反転を実機確認 — IN_PROGRESS  
+
+[Current Step]  
+P8の再検証。前回は観測対象のD10自身をLOW駆動していたため、PA7のHIGH出力を正しく観測できない接続条件になっていた可能性がある。
+
+[Next Action]  
+修正版LoopRTコマンドを実行し、D10を駆動しない状態で、1回目のD8立ち上がり後にD10がHIGH、2回目の立ち上がり後にD10がLOWになるかを確認する。
+
+[Verification Criteria]  
+- 実験開始時にD10がLOWであること。  
+- D8の1回目の立ち上がりから約10 msおよび約110 ms後はD10がLOWであること。  
+- 1回目の立ち上がりから約320 ms後にD10がHIGHになること。  
+- D8の2回目の立ち上がりから約10 msおよび約110 ms後はD10がHIGHであること。  
+- 2回目の立ち上がりから約320 ms後にD10がLOWになること。  
+- D10をArduino Nano側からHIGHまたはLOWに駆動していないこと。

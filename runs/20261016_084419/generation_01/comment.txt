@@ -1,0 +1,34 @@
+[Objective]  
+PA3（Arduino Nano D8）の立ち上がりエッジごとに、PA7（Arduino Nano D10）の状態を反転し、約300 msかけてLOW/HIGHを切り替える動作を実機検証する。
+
+[Changes]  
+avr-gccで検出されたコンパイルエラーを修正した。`TCB_CLKSEL_DIV2_gc`を、ATtiny202用デバイスヘッダで定義されている`TCB_CLKSEL_CLKDIV2_gc`へ変更した。その他のコードとLoopRT試験手順は維持した。
+
+[Results]  
+前回の実験は`TCB_CLKSEL_DIV2_gc`が未定義だったため、コンパイルに失敗した。フラッシュ書き込みおよびLoopRT実験は実行されていない。実機の測定値はまだ存在しない。
+
+[Assessment]  
+前回はコード未コンパイルのため、要求動作は未検証である。今回の修正により、報告されたコンパイルエラーの原因は修正した。ただし、修正後のコンパイル、書き込み、PA7の初期LOW、約300 msの遷移、2回の立ち上がりエッジによる反転は未確認である。
+
+[Development Plan]  
+- P1: PA3入力とPA7初期LOW出力を実装 — IMPLEMENTED  
+- P2: PA3立ち上がりエッジ検出を実装 — IMPLEMENTED  
+- P3: PA7を約300 msで反転させる制御を実装 — IMPLEMENTED  
+- P4: ATtiny202向けにコンパイルして書き込み可能であることを確認 — IN_PROGRESS  
+- P5: LoopRTで初期PA7がLOWであることを確認 — NOT_STARTED  
+- P6: 1回目のPA3立ち上がりでPA7がLOWからHIGHへ約300 msで変化することを確認 — NOT_STARTED  
+- P7: 2回目のPA3立ち上がりでPA7がHIGHからLOWへ約300 msで変化することを確認 — NOT_STARTED  
+
+[Current Step]  
+P4のコンパイルおよび書き込み確認。前回はデバイスヘッダの定数名不一致で実験開始前に停止したため、まず修正後のコードをビルド可能にする必要がある。
+
+[Next Action]  
+修正後のコードをavr-gccでコンパイルし、ATtiny202へ書き込んだ後、提示したLoopRTコマンドを実行する。
+
+[Verification Criteria]  
+- コンパイルエラーが発生しないこと。  
+- ATtiny202へのフラッシュ書き込みが成功すること。  
+- 実験開始時にD10がLOWであること。  
+- D8の1回目の立ち上がり後、D10が約300 msかけてHIGH側へ変化し、最終的にHIGHになること。  
+- D8の2回目の立ち上がり後、D10が約300 msかけてLOW側へ変化し、最終的にLOWになること。  
+- 上記を実機で確認するまで、要求動作を成功とは判定しない。
