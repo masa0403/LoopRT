@@ -1,0 +1,32 @@
+[INFO] Execute Experiment
+[INFO] Experiment Start
+[HOST] GPIO D10 LOW
+[DONE]
+[INFO] Execute Delay: 100 ms
+[DONE]
+[DEBUG] Received I
+[DEBUG] Read I argument
+[DEBUG] I pin = 10
+[OBSERVE] D10 LOW
+[DONE]
+[HOST] GPIO D8 HIGH
+[DONE]
+[INFO] Execute Delay: 100 ms
+[DONE]
+[DEBUG] Received I
+[DEBUG] Read I argument
+[DEBUG] I pin = 10
+[OBSERVE] D10 LOW
+[DONE]
+[HOST] GPIO D8 LOW
+[DONE]
+[INFO] Execute Delay: 100 ms
+[DONE]
+[DEBUG] Received I
+[DEBUG] Read I argument
+[DEBUG] I pin = 10
+[OBSERVE] D10 LOW
+[DONE]
+[INFO] Execute End
+[DONE]
+Experiment End

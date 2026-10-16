@@ -1,0 +1,7 @@
+avr-gcc compile error:
+/home/masa/デスクトップ/GitHub/LoopRT/runs/20261016_084419/generation_01/code.c: In function 'tcb0_init':
+/home/masa/デスクトップ/GitHub/LoopRT/runs/20261016_084419/generation_01/code.c:66:18: error: 'TCB_CLKSEL_DIV2_gc' undeclared (first use in this function); did you mean 'TCB_CLKSEL_CLKDIV2_gc'?
+     TCB0.CTRLA = TCB_CLKSEL_DIV2_gc | TCB_ENABLE_bm;
+                  ^~~~~~~~~~~~~~~~~~
+                  TCB_CLKSEL_CLKDIV2_gc
+/home/masa/デスクトップ/GitHub/LoopRT/runs/20261016_084419/generation_01/code.c:66:18: note: each undeclared identifier is reported only once for each function it appears in
